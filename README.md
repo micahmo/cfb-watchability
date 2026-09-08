@@ -22,18 +22,75 @@ No API key, no account, no database.
 situation, who has the ball, the network, the pregame line, and any tags that apply:
 `GAME ON THE LINE`, `UPSET ALERT`, `RECENT SWINGS`, `INSTANT CLASSIC`, `OVERTIME`.
 
-The 0-100 score blends how close the game is, how late it is, endgame drama, recent
-win-probability swings, how far the underdog is running ahead of the closing line, and scoring
-pace. A **Rank by** control shifts the weighting between "best game" (purely how close and how
-late) and "biggest game" (favouring what the country is watching).
-
 **Worth planning around**, grouped by day with days in chronological order and games ranked
 within each day, so you plan Friday before you plan Saturday. Each row shows kickoff time, the
 line, the over/under and the network.
 
 **Just finished**, the recent recap, best first.
 
-Why any of it works the way it does is in [docs/design-notes.md](docs/design-notes.md).
+## How the score works
+
+Every live game gets a 0-100 score, and the board sorts on it.
+
+**The main term is how close the game is, weighted by how late it is.** A tie in
+the first quarter is not the same event as a tie with ninety seconds left, so
+closeness is multiplied by `0.2 + 0.8 * progress²`. Closeness itself comes from
+ESPN's live win probability, falling back to a margin curve when ESPN stops
+publishing one.
+
+**A second term catches what win probability misses.** A team down five with the
+ball and thirty seconds left has a terrible win probability and is the most
+watchable thing on television. So one-score games inside the final five minutes
+get a `clutch` score, weighted up when the *trailing* team has the ball. The
+dominant term is whichever of the two is higher, so a game qualifies on either.
+
+Four smaller components adjust it:
+
+| Component | What it measures |
+| --- | --- |
+| `prominence` | How much of the country cares. Conference tier, best rank, and broadcast slot |
+| `upset` | How far the underdog is running ahead of the pregame closing line |
+| `swing` | Cumulative win-probability movement over the last fifteen minutes |
+| `stakes` | Both teams ranked, both top-10, conference game |
+| `pace` | Projected total points, so a 45-38 track meet beats a 10-7 slog |
+
+`prominence` deliberately takes the **better** of the two programs. One blue blood
+is enough to put a game in the national conversation, which is why a ranked team
+struggling against a MAC opponent is a bigger story than an excellent Sun Belt
+game. Broadcast slot feeds into it because networks allocate their best inventory
+to the games they expect to draw, so ABC and NBC rate far above ESPN+.
+
+`upset` uses the **pregame closing line**, not the ranking gap. Rank cannot tell a
+27-point mismatch from a coin flip, and both can look like "ranked versus
+unranked". A live line is no good either, because it moves with the game and prices
+the surprise away. The ranking gap survives at 60% strength as a fallback, so an
+unranked team beating a ranked one still registers.
+
+### Weight profiles
+
+Whether "the best game" means the closest game or the biggest one is a taste
+question, so it is a control rather than a fixed answer. Each profile sums to 1.
+
+| Profile | Closeness | Prominence | Reads as |
+| --- | --- | --- | --- |
+| Best game | 0.74 | 0.04 | Purely how close and how late |
+| Balanced (default) | 0.58 | 0.18 | Closeness first, big programs break ties |
+| Biggest game | 0.42 | 0.36 | Favour what the country is watching |
+
+The server ships every component and the browser recombines them, so switching is
+instant. A game with a 25-point margin past the 80% mark is capped at 8 regardless
+of what the other terms think.
+
+### Before kickoff
+
+Upcoming games get a separate `anticipation` rating driven mostly by the spread,
+since nothing we compute beats the market at predicting a close game. Note the
+asymmetry with the live score: pregame quality takes the **worse** of the two
+teams, because planning an evening around a mismatch is a bad idea however good the
+favourite is.
+
+Fuller reasoning, and the games that forced each of these decisions, are in
+[docs/design-notes.md](docs/design-notes.md).
 
 ## Running it
 
