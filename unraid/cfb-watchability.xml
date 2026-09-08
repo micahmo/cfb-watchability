@@ -1,0 +1,61 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>cfb-watchability</Name>
+  <Repository>ghcr.io/micahmo/cfb-watchability:latest</Repository>
+  <Registry>https://github.com/micahmo/cfb-watchability/pkgs/container/cfb-watchability</Registry>
+  <Network>bridge</Network>
+  <MyIP/>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/micahmo/cfb-watchability/issues</Support>
+  <Project>https://github.com/micahmo/cfb-watchability</Project>
+  <Overview>
+    Live college football, ranked by how good each game is right now.
+
+    Polls ESPN's public scoreboard and scores every in-progress game on closeness
+    weighted by lateness, endgame drama, recent win-probability swings, upset
+    magnitude against the pregame closing line, and scoring pace. Also ranks the
+    week ahead by how much each matchup is worth planning around.
+
+    Stateless: no volumes or database. Needs no API keys.
+  </Overview>
+  <Category>Other: Tools:</Category>
+  <WebUI>http://[IP]:[PORT:8787]/</WebUI>
+  <TemplateURL>https://raw.githubusercontent.com/micahmo/cfb-watchability/main/unraid/cfb-watchability.xml</TemplateURL>
+  <Icon>https://raw.githubusercontent.com/micahmo/cfb-watchability/main/public/icon-512.png</Icon>
+  <ExtraParams>--health-cmd="wget -qO- http://127.0.0.1:8787/api/health >/dev/null || exit 1" --health-interval=60s</ExtraParams>
+  <PostArgs/>
+  <CPUset/>
+  <DateInstalled/>
+  <DonateText/>
+  <DonateLink/>
+  <Requires/>
+
+  <Config Name="Port" Target="8787" Default="8787" Mode="tcp"
+          Description="Host port for the board and its JSON API. The container always listens on 8787. Change this if another container already publishes that port on the host. Put it behind a reverse proxy or a tunnel rather than exposing it directly."
+          Type="Port" Display="always" Required="true" Mask="false">8787</Config>
+
+  <Config Name="Timezone" Target="TZ" Default="America/New_York" Mode=""
+          Description="Must be US Eastern or close to it. The poller asks ESPN for yesterday-through-today, and those day boundaries decide whether a game running past midnight is still visible."
+          Type="Variable" Display="always" Required="true" Mask="false">America/New_York</Config>
+
+  <Config Name="Live poll interval (ms)" Target="POLL_MS" Default="30000" Mode=""
+          Description="How often to refresh while games are live."
+          Type="Variable" Display="advanced" Required="false" Mask="false">30000</Config>
+
+  <Config Name="Idle poll interval (ms)" Target="IDLE_POLL_MS" Default="300000" Mode=""
+          Description="How often to poll when nothing is live. The poller also wakes just after the next kickoff regardless."
+          Type="Variable" Display="advanced" Required="false" Mask="false">300000</Config>
+
+  <Config Name="ESPN group" Target="ESPN_GROUPS" Default="80" Mode=""
+          Description="80 is FBS, 81 is FCS."
+          Type="Variable" Display="advanced" Required="false" Mask="false">80</Config>
+
+  <Config Name="Schedule lookahead (days)" Target="SCHEDULE_DAYS" Default="8" Mode=""
+          Description="How far ahead the planning list reaches."
+          Type="Variable" Display="advanced" Required="false" Mask="false">8</Config>
+
+  <Config Name="Recap window (hours)" Target="RECENT_WINDOW_HOURS" Default="10" Mode=""
+          Description="How far back the just-finished list reaches."
+          Type="Variable" Display="advanced" Required="false" Mask="false">10</Config>
+</Container>
