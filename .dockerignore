@@ -1,0 +1,9 @@
+node_modules
+dist
+dist-server
+.git
+.github
+*.log
+.vscode
+scripts
+README.md

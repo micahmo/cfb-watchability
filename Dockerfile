@@ -1,0 +1,38 @@
+# syntax=docker/dockerfile:1
+
+# --- build -------------------------------------------------------------------
+FROM node:22-alpine AS build
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+RUN npm ci
+
+COPY . .
+RUN npm run build
+
+# --- runtime -----------------------------------------------------------------
+FROM node:22-alpine AS runtime
+WORKDIR /app
+
+# The compiled server uses only the Node standard library, so the runtime image
+# carries no node_modules at all. tzdata is needed for TZ to resolve: the poller
+# asks ESPN for "yesterday through today", and those day boundaries have to be in
+# US Eastern or late kickoffs fall outside the window.
+RUN apk add --no-cache tzdata wget
+
+COPY --from=build /app/dist ./dist
+COPY --from=build /app/dist-server ./dist-server
+
+ENV NODE_ENV=production \
+    PORT=8787 \
+    HOST=0.0.0.0 \
+    DIST_DIR=/app/dist \
+    TZ=America/New_York
+
+EXPOSE 8787
+USER node
+
+HEALTHCHECK --interval=60s --timeout=5s --start-period=20s --retries=3 \
+  CMD wget -qO- http://127.0.0.1:8787/api/health >/dev/null || exit 1
+
+CMD ["node", "dist-server/server/index.js"]
