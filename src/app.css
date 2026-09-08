@@ -1,5 +1,9 @@
 :root {
   --bg: #0b0d12;
+  /* Peak of the header gradient. Note this is NOT what theme_color should be: the
+     gradient has already faded by the time it reaches the top edge, which samples
+     at about #131a2d. */
+  --bg-top: #16203a;
   --bg-raised: #12161f;
   --bg-card: #161b26;
   --bg-card-hi: #1c2331;
@@ -34,7 +38,10 @@ body {
   margin: 0;
   min-height: 100vh;
   background:
-    radial-gradient(1200px 600px at 50% -10%, #16203a 0%, transparent 60%),
+    /* Centre pinned in pixels, not a percentage: at -10% the gradient origin
+       moves with page height, so the colour at the top edge changes per page
+       and no fixed theme_color can match it. */
+    radial-gradient(1200px 600px at 50% -90px, var(--bg-top) 0%, transparent 60%),
     var(--bg);
   color: var(--text);
   font-size: 14px;
