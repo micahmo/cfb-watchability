@@ -1,0 +1,29 @@
+{
+  "name": "cfb-watchability",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently -n server,web -c cyan,magenta \"npm:dev:server\" \"npm:dev:web\"",
+    "dev:server": "tsx watch server/index.ts",
+    "dev:web": "vite",
+    "build": "npm run build:web && npm run build:server",
+    "start": "node dist-server/server/index.js",
+    "preview": "vite preview",
+    "check": "svelte-check --tsconfig ./tsconfig.app.json && tsc -p tsconfig.node.json && tsc -p tsconfig.server.json",
+    "prod": "npm run build && npm start",
+    "build:web": "vite build",
+    "build:server": "tsc -p tsconfig.server.build.json"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^5.0.3",
+    "@tsconfig/svelte": "^5.0.4",
+    "@types/node": "^26.5.0",
+    "concurrently": "^9.1.2",
+    "svelte": "^5.28.1",
+    "svelte-check": "^4.1.6",
+    "tsx": "^4.19.3",
+    "typescript": "~5.8.3",
+    "vite": "^6.3.5"
+  }
+}

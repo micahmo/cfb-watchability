@@ -1,0 +1,77 @@
+:root {
+  --bg: #0b0d12;
+  --bg-raised: #12161f;
+  --bg-card: #161b26;
+  --bg-card-hi: #1c2331;
+  --border: #232b3a;
+  --border-hi: #33405a;
+  --text: #e8ecf4;
+  --text-dim: #9aa5b8;
+  --text-faint: #63708a;
+  --hot: #ff4d4f;
+  --warm: #ffa53d;
+  --cool: #4d9dff;
+  --calm: #55617a;
+  --good: #38d39f;
+
+  color-scheme: dark;
+  font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* Paint the root too, so overscroll and the area behind the viewport stay dark
+   rather than flashing the browser's default white. */
+html {
+  background: var(--bg);
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(1200px 600px at 50% -10%, #16203a 0%, transparent 60%),
+    var(--bg);
+  color: var(--text);
+  font-size: 14px;
+}
+
+#app {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 28px 20px 80px;
+}
+
+h1, h2, h3 {
+  margin: 0;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+a {
+  color: inherit;
+}
+
+.mono {
+  font-family: "JetBrains Mono", "Cascadia Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Network chip. Shared by the live cards and the upcoming rows: it is the same
+   piece of information in both places ("where do I find this"), so it is defined
+   once globally rather than duplicated per component. */
+.channel-chip {
+  flex: none;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--text-dim);
+  border: 1px solid var(--border-hi);
+  border-radius: 4px;
+  padding: 1px 6px;
+  white-space: nowrap;
+}
