@@ -11,9 +11,9 @@ Covers the **NFL** and **college football** on separate tabs, each with its own 
 
 No API key, no account, no database.
 
-> **The screenshots below use test data.** Teams, lines, networks and listings are real, but the
-> scores, clocks and records are fabricated, so the ratings shown are not a real assessment of any
-> actual week or season.
+> **The screenshots below use test data.** Scores, clocks and records are fabricated, and the
+> slate is whichever week they happened to be captured in, so nothing shown is a real assessment
+> of any game.
 
 | | What is on right now | What to plan around |
 | --- | --- | --- |
