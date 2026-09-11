@@ -7,6 +7,7 @@
   import LeagueTabs from "./lib/LeagueTabs.svelte";
   import FavouriteConferences from "./lib/FavouriteConferences.svelte";
   import MarketPicker from "./lib/MarketPicker.svelte";
+  import AlertsPicker from "./lib/AlertsPicker.svelte";
   import UpdatePrompt from "./lib/UpdatePrompt.svelte";
   import { checkForUpdateNow } from "./lib/appUpdate";
   import GameCard from "./lib/GameCard.svelte";
@@ -25,9 +26,9 @@
    * because they share a row: two panels open at once would overlap, and a panel
    * that is a flex sibling of its own button wedges the row apart when it opens.
    */
-  let openPanel = $state<"favourites" | "market" | null>(null);
+  let openPanel = $state<"favourites" | "market" | "alerts" | null>(null);
 
-  function togglePanel(which: "favourites" | "market"): void {
+  function togglePanel(which: "favourites" | "market" | "alerts"): void {
     openPanel = openPanel === which ? null : which;
   }
 
@@ -243,6 +244,11 @@
         onclose={() => (openPanel = null)}
       />
     {/if}
+    <AlertsPicker
+      league={prefs.league}
+      open={openPanel === "alerts"}
+      ontoggle={() => togglePanel("alerts")}
+    />
   </div>
 </header>
 

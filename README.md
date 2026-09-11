@@ -34,6 +34,10 @@ kickoff time, the line, the over/under and the network.
 
 **Just finished**, the recent recap, best first. Games stay on the board for eighteen hours.
 
+**Alerts**, optional, off by default. Four kinds, chosen per league: a game becoming worth
+switching to, one turning into something memorable, an upset in progress, and the pick of a busy
+kickoff window. At most three a day per league, never for a game your market is not carrying.
+
 **League tabs** switch between NFL and college; the NFL opens by default. **Favourite
 conferences** push the games you care about up the board, weighted higher when both teams
 qualify than one. Tab, favourites and market all persist in the browser.
@@ -134,10 +138,20 @@ docker run -d --name football-watchability \
   ghcr.io/micahmo/football-watchability:latest
 ```
 
-There are no volumes and no database. All state is in memory and rebuilds from ESPN within a
-poll or two, so the container can be replaced freely. The only cost of a restart is that
+The board itself needs no volume and no database. All of it is in memory and rebuilds from ESPN
+within a poll or two, so the container can be replaced freely. The only cost of a restart is that
 win-probability swing history resets, which suppresses the `RECENT SWINGS` tag for about fifteen
 minutes.
+
+**Notifications are the exception**, because a push keypair and its subscriptions cannot be
+rebuilt from anywhere. Mount a volume and point `NOTIFY_DIR` at it:
+
+```bash
+  -v /path/on/host:/config   -e NOTIFY_DIR=/config ```
+
+Without it the feature is simply unavailable and everything else is unchanged. The server checks
+that the directory is really a mounted volume rather than trusting the variable, so a forgotten
+`-v` hides the toggle instead of collecting subscriptions that vanish on the next update.
 
 **Set `TZ` to US Eastern or near it.** The poller asks ESPN for "yesterday through today", and
 those day boundaries are what keep a game running past midnight visible.
@@ -169,6 +183,8 @@ only offers to install from a secure context, which rules out plain-http LAN add
 | `SCHEDULE_POLL_MS` | `600000` | Schedule refresh interval |
 | `RECENT_WINDOW_HOURS` | `18` | How far back the recap reaches |
 | `ALLOWED_HOSTS` | - | Extra hostnames the dev server answers to, comma separated |
+| `NOTIFY_DIR` | - | Where to keep push keys and subscriptions. Must be a mounted volume |
+| `NOTIFY_CONTACT` | - | `mailto:` address sent to push services with each delivery |
 
 Replaying a past slate is the easiest way to see a full board on a quiet weeknight:
 
@@ -182,8 +198,12 @@ ESPN_DATES=20260905 RECENT_WINDOW_HOURS=120 npm run dev:server
 - `GET /api/snapshot?league=nfl&zip=02134` - the same board, annotated with what that market is
   carrying. Ignored for college
 - `GET /api/health` - per-league poller status, last update, failure count, next poll
+- `GET /api/notifications/config` - whether alerts are available, and the public push key
+- `POST /api/notifications/subscribe` - register a push subscription and its preferences
+- `POST /api/notifications/unsubscribe` - drop one
 
-Both are read-only. Every other method returns 405.
+Those two POSTs are the only writes the server accepts; bodies are capped at 8 KB and every field
+is validated. Every other method and path returns 405.
 
 ## Layout
 

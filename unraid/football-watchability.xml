@@ -55,7 +55,19 @@
           Description="How far ahead the planning list reaches."
           Type="Variable" Display="advanced" Required="false" Mask="false">8</Config>
 
-  <Config Name="Recap window (hours)" Target="RECENT_WINDOW_HOURS" Default="10" Mode=""
+  <Config Name="Recap window (hours)" Target="RECENT_WINDOW_HOURS" Default="18" Mode=""
           Description="How far back the just-finished list reaches."
-          Type="Variable" Display="advanced" Required="false" Mask="false">10</Config>
+          Type="Variable" Display="advanced" Required="false" Mask="false">18</Config>
+
+  <Config Name="Notification storage" Target="/config" Default="/mnt/user/appdata/football-watchability" Mode="rw"
+          Description="Holds the push keypair and subscriptions. Only needed for alerts; the board itself keeps nothing."
+          Type="Path" Display="always" Required="false" Mask="false">/mnt/user/appdata/football-watchability</Config>
+
+  <Config Name="Notification directory" Target="NOTIFY_DIR" Default="/config" Mode=""
+          Description="Where to keep push keys and subscriptions. Leave as /config to match the path above. Alerts stay off unless this points at a real volume."
+          Type="Variable" Display="always" Required="false" Mask="false">/config</Config>
+
+  <Config Name="Notification contact" Target="NOTIFY_CONTACT" Default="" Mode=""
+          Description="A mailto: address sent to push services with each delivery, so they can reach you about problems."
+          Type="Variable" Display="advanced" Required="false" Mask="false"></Config>
 </Container>

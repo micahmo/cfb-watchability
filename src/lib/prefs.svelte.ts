@@ -1,4 +1,5 @@
 import type { League } from "../../shared/types";
+import type { Category } from "./push";
 
 const KEY = "football-watchability-prefs";
 
@@ -17,6 +18,8 @@ export interface Prefs {
    * means "work it out for me": this one means "do not, even if you can".
    */
   marketOff: boolean;
+  /** Alert categories per league. Empty everywhere means notifications are off. */
+  alerts: Record<League, Category[]>;
 }
 
 const DEFAULTS: Prefs = {
@@ -24,6 +27,7 @@ const DEFAULTS: Prefs = {
   favourites: { nfl: [], cfb: [] },
   zip: null,
   marketOff: false,
+  alerts: { nfl: [], cfb: [] },
 };
 
 function load(): Prefs {
@@ -35,6 +39,7 @@ function load(): Prefs {
       ...DEFAULTS,
       ...saved,
       favourites: { ...DEFAULTS.favourites, ...(saved.favourites ?? {}) },
+      alerts: { ...DEFAULTS.alerts, ...(saved.alerts ?? {}) },
     };
   } catch {
     // Private windows and blocked site data both throw here.
@@ -55,6 +60,11 @@ export function persist(): void {
 export function setZip(zip: string): void {
   prefs.zip = /^\d{5}$/.test(zip) ? zip : null;
   prefs.marketOff = false;
+  persist();
+}
+
+export function setAlerts(league: League, categories: Category[]): void {
+  prefs.alerts[league] = categories;
   persist();
 }
 
