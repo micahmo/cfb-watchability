@@ -602,9 +602,31 @@ That makes the shape obvious, and it is what ESPN's own site does: fetch the sco
 initial state, subscribe, apply patches, re-score. It would take the live board from roughly fifty
 seconds stale to a couple of seconds.
 
-Not yet built. What it needs beyond the client itself: honouring the 30-second heartbeat,
-re-fetching over REST on reconnect to resync, and keeping REST polling anyway for odds, standings
-and the schedule, none of which come down this feed.
+Not yet built. What it needs beyond the client itself: answering pings, re-fetching over REST on
+reconnect to resync, and keeping REST polling anyway for odds, standings and the schedule, none of
+which come down this feed.
+
+### What a second capture, against live football, added
+
+Three things the first pass had wrong or had not seen.
+
+**`op:"R"` carries patches too, not just `op:"P"`.** Decoding only `P` made the feed look like it
+had gone silent after an opening burst while updates were in fact still arriving.
+
+**The inner `~c` field says how the payload is encoded.** `1` is the base64 zlib described above;
+`0` means `pl` is already the patch array as plain JSON. Assuming compression throws on every
+uncompressed message.
+
+**Unanswered websocket pings are what actually kills the session.** These are protocol-level ping
+frames, not the application `op:"B"` heartbeat, and they are easy to miss because a JSON parser
+skips them silently as unparseable. Without pongs the feed stopped after about two minutes and
+looked like a quiet topic; with them it ran continuously, roughly 130 patches a minute across
+three or four live games, answering about six pings a minute.
+
+The payload is what the board needs: `status/clock`, `status/period`, `competitors/N/score`,
+`linescores`, and the whole `situation` block including possession and down and distance. So the
+feed is confirmed usable for college as well as the NFL. Volume against a full Saturday slate is
+still unmeasured, and that is the open question before building on it.
 
 This also settles the SSE question, which was previously "no". That answer assumed the server
 stays 30 seconds behind ESPN, which makes pushing to the client pointless. The two go together:
