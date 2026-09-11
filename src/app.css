@@ -108,9 +108,6 @@ a {
   white-space: nowrap;
   text-overflow: ellipsis;
 }
-.dd-toggle.set {
-  color: var(--text);
-}
 @media (hover: hover) {
   .dd-toggle:hover {
     color: var(--text);

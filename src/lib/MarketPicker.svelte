@@ -58,7 +58,7 @@
   }
 </script>
 
-<button type="button" class="dd-toggle" class:set={active !== null} onclick={() => ontoggle?.()}>
+<button type="button" class="dd-toggle" onclick={() => ontoggle?.()}>
   <!-- The whole explanation lives inside the panel. Out here a dot is enough to say
        there is something to set, and unlike a banner it costs no vertical space. -->
   {#if nudge && !open}<span class="dot" aria-hidden="true"></span>{/if}
