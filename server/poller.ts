@@ -22,6 +22,8 @@ const DATES = process.env.ESPN_DATES || undefined;
 const RECENT_WINDOW_MS = Number(process.env.RECENT_WINDOW_HOURS ?? 18) * 60 * 60 * 1000;
 /** The schedule barely moves, so it is fetched far less often than the scores. */
 const SCHEDULE_POLL_MS = Number(process.env.SCHEDULE_POLL_MS ?? 10 * 60 * 1000);
+/** Retry gap after a failed schedule fetch, while the list is still empty. */
+const SCHEDULE_RETRY_MS = 30_000;
 /** How many days ahead the planning list looks. */
 const SCHEDULE_DAYS = Number(process.env.SCHEDULE_DAYS ?? 8);
 /** Generous cap: the client groups these by day, so slicing by score alone here
@@ -134,6 +136,12 @@ export class LeaguePoller {
       console.error(
         `[${this.tag()}] schedule failed: ${err instanceof Error ? err.message : String(err)}`,
       );
+      // Try again soon rather than waiting out the full interval. A failure on
+      // startup otherwise leaves the planning list empty for ten minutes, which
+      // looks exactly like a slate with no games in it.
+      if (this.scheduled.length === 0) {
+        setTimeout(() => void this.pollSchedule(), SCHEDULE_RETRY_MS);
+      }
     }
   }
 

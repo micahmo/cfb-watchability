@@ -378,7 +378,14 @@
      about. Scoped under .panel to outrank ".panel p", which sets card body text
      to 13px and was silently winning against a bare .cutoff. */
   .panel .cutoff {
-    margin: 22px 4px 8px;
+    /* Its own row in the list, with the divider above it rather than inherited
+       from the row before. The available rows are wrapped so the last one drops
+       its bottom border, which leaves exactly one line here and no gap to pad
+       around: the header reads as starting a section instead of captioning the
+       entry beneath it. */
+    margin: 0;
+    padding: 11px 4px 7px;
+    border-top: 1px solid var(--border);
     font-size: 10px;
     text-transform: uppercase;
     letter-spacing: 0.1em;
