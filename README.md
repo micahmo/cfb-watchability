@@ -11,13 +11,16 @@ Covers the **NFL** and **college football** on separate tabs, each with its own 
 
 No API key, no account, no database.
 
+> **The screenshots below use test data.** Teams, lines, networks and listings are real, but the
+> scores, clocks and records are fabricated, so the ratings shown are not a real assessment of any
+> actual week or season.
+
 | | What is on right now | What to plan around |
 | --- | --- | --- |
 | **NFL** | <img src="docs/nfl-live.png" width="330" alt="Live NFL board"> | <img src="docs/nfl-upcoming.png" width="330" alt="Upcoming NFL games grouped by day"> |
 | **College** | <img src="docs/cfb-live.png" width="330" alt="Live college board"> | <img src="docs/cfb-upcoming.png" width="330" alt="Upcoming college games grouped by day"> |
 
-<sub>Teams, lines, networks and listings are real; scores, clocks and records in the live shots are
-fabricated. <a href="docs/design-notes.md">Design notes</a> cover how these are regenerated.</sub>
+<sub><a href="docs/design-notes.md">Design notes</a> cover how these are regenerated.</sub>
 
 ## What the board shows
 
