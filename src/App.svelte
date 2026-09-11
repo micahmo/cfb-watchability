@@ -320,7 +320,12 @@
             </div>
             {#if day.unavailable.length > 0}
               <div class="blocked">
-                <p class="cutoff">not on your channels <span class="down" aria-hidden="true">&#9662;</span></p>
+                <p class="cutoff">
+                  not on your channels
+                  <svg class="down" viewBox="0 0 10 12" aria-hidden="true">
+                    <path d="M5 1 V9 M1.5 6 L5 9.5 L8.5 6" />
+                  </svg>
+                </p>
                 {#each day.unavailable as game (game.id)}
                   <UpcomingRow {game} score={anticipationOf(game)} />
                 {/each}
@@ -393,15 +398,21 @@
     letter-spacing: 0.1em;
     color: var(--text-faint);
   }
-  /* Points at what the header is about. A solid triangle rather than an arrow
-     glyph, which at this size renders tall and thin and looked out of place.
-     Kept faint and trailing so it reads as an indicator rather than the dropdown
-     control the same shape means elsewhere on the page. */
+  /* Drawn rather than set in a glyph. The arrow characters render tall and thin
+     at this size, and a solid triangle is the dropdown caret used everywhere else
+     on this page. This is short, thick, and unambiguously an arrow, and it does
+     not vary with whatever font happens to be resolved. */
   .panel .cutoff .down {
-    margin-left: 3px;
-    font-size: 9px;
-    opacity: 0.65;
-    vertical-align: 1px;
+    width: 9px;
+    height: 11px;
+    margin-left: 4px;
+    vertical-align: -1px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    opacity: 0.7;
   }
   .controls-row {
     display: flex;
