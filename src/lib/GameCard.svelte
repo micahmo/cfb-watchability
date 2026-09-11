@@ -43,7 +43,13 @@
 
   /* Red is for things that are happening now. "UPSET POTENTIAL" stays blue,
      since the upset has not actually happened yet. */
-  const HOT_TAGS = new Set(["INSTANT CLASSIC", "OVERTIME", "GAME ON THE LINE", "UPSET ALERT"]);
+  const HOT_TAGS = new Set([
+    "INSTANT CLASSIC",
+    "OVERTIME",
+    "GAME ON THE LINE",
+    "UPSET ALERT",
+    "BIG UPSET",
+  ]);
 </script>
 
 <article class="card" class:unavailable style="--accent: {accent}">

@@ -12,10 +12,20 @@
 
   let {
     league,
+    marketZip = null,
     open = false,
     ontoggle,
   }: {
     league: League;
+    /**
+     * The postal code the board actually resolved, typed or detected.
+     *
+     * Not `prefs.zip`: that is null whenever the market came from the network,
+     * which is the default path. Sending it left every subscription with no
+     * market, so the promise that alerts skip games you cannot watch was quietly
+     * doing nothing.
+     */
+    marketZip?: string | null;
     open?: boolean;
     ontoggle?: () => void;
   } = $props();
@@ -76,7 +86,7 @@
         const ok = await subscribe({
           publicKey: config.publicKey,
           wants,
-          zip: prefs.zip,
+          zip: marketZip,
           favourites: prefs.favourites,
         });
         if (!ok) {

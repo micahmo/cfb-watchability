@@ -394,6 +394,28 @@ ahead, within one score" measures the raw margin, and UMass were 16 ahead. The q
 matters is performance against the line, `underdog margin + spread`, which is +45.5 here against
 +10 for a seven-point underdog leading by three.
 
+### A finished game is judged on whether it mattered, not whether it was tense
+
+Those are different questions, and the recap answered the second by default because a final is
+graded on closeness. UMass beating Rutgers as 29.5-point underdogs scored **23.1**: the biggest
+result of the weekend, sorted to the bottom of the list people read to find out what they missed.
+
+So an upset can carry a finished game the way closeness carries a live one, capped below what a
+real classic scores so the best finish still leads. That single change reorders the recap into
+something worth scanning:
+
+```
+80.6  WMU @ MICH    12-13   MICH -27.5   INSTANT CLASSIC, ONE SCORE FINISH
+71.7  CIT @ CLT     43-41   CLT -20.5    OVERTIME, BIG UPSET
+64.1  MASS @ RUTG   37-21   RUTG -29.5   BIG UPSET      (was 23.1)
+60.9  OKST @ TLSA   10-24   OKST -13.5   BIG UPSET
+```
+
+Two supporting changes. Finished games get `UPSET` and `BIG UPSET` rather than `UPSET ALERT`,
+because an alert tells you to go and watch something that is already over. And the closing line is
+backfilled for finished games, not only live ones: a game that started and ended between two polls
+was never seen live, so the recap had no line to judge the result against.
+
 ### Concurrency changes the wording, not the decision
 
 How many other games are live is a good measure of how valuable a notification is: the Michigan

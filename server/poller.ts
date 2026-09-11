@@ -236,7 +236,16 @@ export class LeaguePoller {
       // stops carrying odds the moment it kicks off.
       for (const raw of games) this.lines.recordFromScoreboard(raw);
       for (const raw of this.scheduled) this.lines.recordFromScoreboard(raw);
-      await this.backfillLines(games.filter((g) => g.state === "in"));
+      // Finished games need the line too, so the recap can answer "did that go as
+      // expected". A game that started and ended between two polls was never seen
+      // live, so it would otherwise have no line at all.
+      await this.backfillLines(
+        games.filter(
+          (g) =>
+            g.state === "in" ||
+            (g.state === "post" && now - Date.parse(g.startDate) < RECENT_WINDOW_MS),
+        ),
+      );
 
       for (const raw of games) {
         if (raw.state === "in") this.swings.record(raw.id, raw.homeWinProb, now);

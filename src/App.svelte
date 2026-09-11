@@ -248,6 +248,7 @@
     {/if}
     <AlertsPicker
       league={prefs.league}
+      marketZip={snapshot?.market?.zip ?? null}
       open={openPanel === "alerts"}
       ontoggle={() => togglePanel("alerts")}
     />
@@ -352,12 +353,13 @@
      borders, and a second half-width line butting into them read as a mistake. */
   /* A recessed block, so the label plainly heads everything inside it rather
      than appearing to annotate the single row beneath. */
+  /* A full-bleed band rather than an inset card. An inset one had rounded corners
+     that collided with the full-width rules above and below it, and its own
+     border-top doubled the one the row above already draws. */
   .panel .blocked {
-    margin-top: 8px;
-    padding: 0 10px;
-    border-top: 1px solid var(--border);
-    background: rgba(0, 0, 0, 0.18);
-    border-radius: 0 0 10px 10px;
+    margin: 0 -18px;
+    padding: 0 18px;
+    background: rgba(255, 255, 255, 0.025);
   }
   .panel .cutoff {
     margin: 0;
@@ -445,6 +447,8 @@
     border: 1px solid var(--border);
     border-radius: 12px;
     padding: 16px 18px;
+    /* So a full-bleed child cannot square off the card's rounded corners. */
+    overflow: hidden;
   }
   .panel.tight {
     padding: 4px 14px;

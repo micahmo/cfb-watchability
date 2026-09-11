@@ -330,6 +330,15 @@ export function upsetTensionScore(
   return clamp(surprise * doubt);
 }
 
+/** Whether the side the closing line made the underdog finished level or ahead. */
+function underdogWon(input: ScoreInputs): boolean {
+  if (input.homeSpread === null || input.homeSpread === 0) return false;
+  const homeFavoured = input.homeSpread < 0;
+  const dog = homeFavoured ? input.away : input.home;
+  const fav = homeFavoured ? input.home : input.away;
+  return dog.score >= fav.score;
+}
+
 export function scoreGame(input: ScoreInputs): ScoreBreakdown {
   const progress = gameProgress(input.period, input.clockSeconds);
   const margin = Math.abs(input.home.score - input.away.score);
@@ -367,6 +376,22 @@ export function scoreGame(input: ScoreInputs): ScoreBreakdown {
       });
 
   const upsetTension = upsetTensionScore(input.homeSpread, input.homeWinProb, input.isFinal === true);
+  const upset = combinedUpset(input, progress);
+
+  /**
+   * A finished game is judged on whether it mattered, not on whether it was tense.
+   *
+   * Those are different questions and the recap answers the second one by
+   * default, because a final is scored on closeness. UMass beating Rutgers as
+   * 29.5-point underdogs graded 23.1: the biggest result of the weekend, sorted
+   * to the bottom of the list somebody reads to find out what they missed. A win
+   * nobody expected is worth knowing about however comfortable it looked by the
+   * end, so an upset can carry a finished game the way closeness carries a live
+   * one. Deliberately below what a genuine classic scores, since the best finish
+   * of the day should still lead the recap.
+   */
+  const decisiveness =
+    input.isFinal === true && upset >= 0.35 && underdogWon(input) ? upset * 0.75 : 0;
 
   const components: ScoreComponents = {
     tension,
@@ -377,7 +402,7 @@ export function scoreGame(input: ScoreInputs): ScoreBreakdown {
     // Three ways to earn the dominant term, and a game qualifies on any of them:
     // it is close and late, it has a decisive snap coming, or something is
     // happening that was not supposed to.
-    primary: Math.max(core, clutch, upsetTension),
+    primary: Math.max(core, clutch, upsetTension, decisiveness),
     prominence: prominenceScore({
       league: input.league,
       homeConferenceId: input.home.conferenceId,
@@ -392,7 +417,7 @@ export function scoreGame(input: ScoreInputs): ScoreBreakdown {
       startDate: input.startDate,
     }),
     swing: swingScore(input.swingMovement),
-    upset: combinedUpset(input, progress),
+    upset,
     stakes: stakesScore(input.league, input.home, input.away, input.conferenceGame, input.divisionGame),
     pace: paceScore(input.league, totalPoints, progress, input.overUnder),
   };
@@ -481,7 +506,12 @@ export function buildTags(game: Game, breakdown: ScoreBreakdown): string[] {
   // Magnitude is carried by `breakdown.upset` itself, which already blends the
   // closing line with the rank gap, so no separate gap gate is needed here.
   if (underdog !== null) {
-    if (breakdown.upset >= 0.35 && underdog.levelOrAhead) {
+    if (isFinal && underdog.levelOrAhead && breakdown.upset >= 0.35) {
+      // Past tense for a finished game: "ALERT" tells you to go and watch
+      // something that is already over. Sized so a glance at the recap separates
+      // a mild surprise from the one people will still be talking about.
+      tags.push(breakdown.upset >= 0.7 ? "BIG UPSET" : "UPSET");
+    } else if (breakdown.upset >= 0.35 && underdog.levelOrAhead) {
       tags.push("UPSET ALERT");
     } else if (
       // Behind but one score away with the clock running out. The upset has not
