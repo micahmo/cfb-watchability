@@ -67,6 +67,54 @@
     if (config === null) void fetchPushConfig().then((c) => (config = c));
   });
 
+  /**
+   * What the server was last told, so the sync below only acts on a real change.
+   * Plain variables rather than state: writing them must not retrigger the effect
+   * that writes them.
+   */
+  let synced: string | null = null;
+  let syncTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /**
+   * Keeps the server's record matching what this browser currently knows.
+   *
+   * Registering only when a category is toggled left two silent failures. A
+   * subscription could die and stay dead, because a push service may rotate an
+   * endpoint and reinstalling the app produces a fresh worker with a new one, and in
+   * both cases the server keeps a record nothing will ever be delivered to while the
+   * viewer sees their switches still on. And anything learned *after* subscribing
+   * never arrived: the market resolves from a snapshot, so subscribing from the
+   * college tab registered no market at all, and changing a favorite conference
+   * moved the board's own ranking without ever reaching the alerts that use it.
+   *
+   * Re-registering whenever the inputs change covers all of it, and the same call
+   * repairs the endpoint on the way past. Silent by design: it never prompts, and
+   * permission already being granted is what makes this a repair rather than a
+   * request.
+   */
+  $effect(() => {
+    const wants = { nfl: prefs.alerts.nfl ?? [], cfb: prefs.alerts.cfb ?? [] };
+    const favorites = prefs.favorites;
+    const zip = marketZip;
+    const key = JSON.stringify({ wants, favorites, zip });
+
+    if (config === null || !config.publicKey || !config.available) return;
+    if (!anyOn || Notification.permission !== "granted") return;
+    // A first run with nothing synced still goes, since that is the endpoint repair.
+    if (key === synced) return;
+
+    const publicKey = config.publicKey;
+    // Ticking four conferences is one update, not four.
+    if (syncTimer !== null) clearTimeout(syncTimer);
+    syncTimer = setTimeout(() => {
+      synced = key;
+      void subscribe({ publicKey, wants, zip, favorites }).then((ok) => {
+        // Let the next change try again rather than leaving the server behind.
+        if (!ok) synced = null;
+      });
+    }, 800);
+  });
+
   async function toggle(category: Category): Promise<void> {
     if (config === null || !config.publicKey) return;
     const next = chosen.includes(category)
@@ -80,6 +128,10 @@
 
     const wants = { nfl: prefs.alerts.nfl ?? [], cfb: prefs.alerts.cfb ?? [] };
     const nowEmpty = wants.nfl.length === 0 && wants.cfb.length === 0;
+
+    // This call is the authoritative one, so the background sync must not repeat it.
+    if (syncTimer !== null) clearTimeout(syncTimer);
+    synced = nowEmpty ? null : JSON.stringify({ wants, favorites: prefs.favorites, zip: marketZip });
 
     try {
       if (nowEmpty) {
@@ -95,6 +147,7 @@
           // Permission refused, or the push service said no. Put the switch back
           // rather than showing it on when nothing will arrive.
           setAlerts(league, previous);
+          synced = null;
           error =
             Notification.permission === "denied"
               ? "Notifications are blocked for this site in your browser settings."
@@ -103,6 +156,7 @@
       }
     } catch {
       setAlerts(league, previous);
+      synced = null;
       error = "Could not reach the server.";
     } finally {
       busy = false;

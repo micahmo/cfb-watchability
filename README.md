@@ -207,9 +207,10 @@ ESPN_DATES=20260905 RECENT_WINDOW_HOURS=120 npm run dev:server
 - `GET /api/notifications/config` - whether alerts are available, and the public push key
 - `POST /api/notifications/subscribe` - register a push subscription and its preferences
 - `POST /api/notifications/unsubscribe` - drop one
+- `POST /api/notifications/ack` - the service worker reporting that a push arrived
 
-Those two POSTs are the only writes the server accepts; bodies are capped at 8 KB and every field
-is validated. Every other method and path returns 405.
+Those three POSTs are the only writes the server accepts; bodies are capped at 8 KB and every
+field is validated. Every other method and path returns 405.
 
 ## Layout
 

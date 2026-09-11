@@ -10,7 +10,7 @@
  * meant a deploy did not reach the phone until the *second* load. Network-first
  * keeps offline support while never showing yesterday's app.
  */
-const CACHE = "football-watchability-v3";
+const CACHE = "football-watchability-v4";
 const SHELL = ["/", "/index.html", "/manifest.webmanifest", "/icon-192.png", "/icon-512.png"];
 
 self.addEventListener("install", (event) => {
@@ -92,7 +92,9 @@ self.addEventListener("push", (event) => {
   const { title, body, league, gameId, category } = payload;
   if (!title) return;
   event.waitUntil(
-    self.registration.showNotification(title, {
+    Promise.all([
+      acknowledge(),
+      self.registration.showNotification(title, {
       body: body ?? "",
       icon: "/icon-192.png",
       badge: "/icon-192.png",
@@ -100,10 +102,33 @@ self.addEventListener("push", (event) => {
       // earlier one rather than stacking a second buzz for the same thing.
       tag: gameId ? `game-${gameId}` : undefined,
       renotify: true,
-      data: { league, gameId, category },
-    }),
+        data: { league, gameId, category },
+      }),
+    ]),
   );
 });
+
+/**
+ * Tells the server a living install received this.
+ *
+ * A push service keeps accepting messages for an endpoint whose app was uninstalled
+ * or reinstalled, so a delivery succeeding proves nothing about whether anything is
+ * still there. Only a running worker can, and this is it saying so. Best effort:
+ * losing an acknowledgement is harmless, and it must never cost the notification.
+ */
+async function acknowledge() {
+  try {
+    const sub = await self.registration.pushManager.getSubscription();
+    if (!sub) return;
+    await fetch("/api/notifications/ack", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ endpoint: sub.endpoint }),
+    });
+  } catch {
+    // Recording only, so a failure changes nothing the viewer sees.
+  }
+}
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();

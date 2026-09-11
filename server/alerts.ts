@@ -213,6 +213,10 @@ export class AlertEngine {
     if (!this.store.available) return 0;
     const now = Date.now();
 
+    // Pushes are about to go out, which is exactly when a dead subscription would
+    // take another one into the void, so it is also when to drop it.
+    this.store.pruneUnacknowledged();
+
     // Whatever is already true when the process starts is not news. Without this
     // a Force Update mid-Saturday re-announces the entire afternoon.
     if (!this.seeded.has(snapshot.league)) {

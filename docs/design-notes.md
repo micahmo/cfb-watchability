@@ -484,6 +484,52 @@ is already watching something. They might simply have forgotten it was on. So th
 phrasing instead: "Switch to X" when there are alternatives, "X is worth putting on" when there
 are not.
 
+### Telling a dead subscription from a living one
+
+Reinstalling the app orphans a subscription, and nothing in the obvious places notices. The
+reinstall is a fresh service worker with a new endpoint, the old record survives because the
+browser does not reliably unsubscribe on uninstall, and the push service keeps returning success
+for the dead endpoint rather than the 410 that `send` watches for. Deduplicating at subscribe time
+cannot help either, because the new install has no memory of the endpoint it replaced, so the
+server cannot know which record the new one supersedes.
+
+Nor can staleness be keyed on the viewer opening the board. Somebody can turn alerts on and then
+never open it again, so "has not loaded lately" describes a satisfied user, not a dead
+subscription.
+
+The one thing that tracks the subscription rather than the person is the service worker, which
+runs on push receipt whether or not the app is open. So it acknowledges: every push it shows, it
+posts its endpoint back, anonymously and keyed on the endpoint, because the worker has no session
+to present and the endpoint is already the subscription's secret. Two timestamps record the two
+sides. `lastPushAt` moves when a push service accepts a message; `lastAckAt` moves when a worker
+says it arrived. A living install keeps them level and a dead one lets the first pull ahead.
+
+The gap, never the wall clock, is what the prune acts on, and that is what keeps a quiet stretch
+safe: a subscription nobody had reason to push to accrues no gap however old its last
+acknowledgement, and a phone that was merely asleep closes the gap as soon as it answers the queued
+push. Thirty days is generous on purpose. Catching orphans is easy, since their gap grows without
+bound; the number has to clear the other direction, the longest a real phone can go unacknowledged
+across sleep, dead zones and iOS throttling.
+
+### The board re-registers itself, which is what makes the rest safe
+
+Registering only when a category is toggled left two silent failures, and the prune would have
+made the first one worse.
+
+A subscription could die and stay dead. Push services rotate endpoints, and the only cure was
+toggling a category off and on, which nobody knows to do. And anything learned *after* subscribing
+never arrived: the market resolves from a snapshot, so subscribing from the college tab registered
+no market at all and the promise that alerts skip games you cannot watch was doing nothing; a
+changed favorite conference moved the board's own ranking without reaching the alerts that use the
+same boost.
+
+Re-registering whenever any of those inputs change covers all of it, and repairs the endpoint on
+the way past. It never prompts: permission already being granted is what makes it a repair rather
+than a request. Two details matter. The explicit toggle stays authoritative and records what it
+sent, so the background sync does not repeat it, and a burst of changes is debounced, so ticking
+four conferences is one update. And a re-registration carrying no market must not erase a known
+one, since the zip is null until a snapshot resolves one, which on the college tab may be never.
+
 ## Telling an open board that it is out of date
 
 The service worker cannot do it. `sw.js` is copied into the build untouched and names no hashed

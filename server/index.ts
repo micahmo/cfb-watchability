@@ -332,6 +332,22 @@ async function handleNotificationWrite(
     return;
   }
 
+  // Posted by the service worker every time it shows a push, which happens even for
+  // somebody who never opens the board. It is the only signal that a subscription is
+  // still attached to a living install, since the push service keeps accepting
+  // messages for an endpoint whose app was reinstalled. Keyed on the endpoint, which
+  // is already the subscription's secret, because the worker has no session to offer.
+  if (url === "/api/notifications/ack") {
+    const endpoint = (body as { endpoint?: unknown })?.endpoint;
+    if (typeof endpoint !== "string") {
+      json(res, { error: "endpoint required" }, 400);
+      return;
+    }
+    subscriptions.acknowledge(endpoint);
+    json(res, { ok: true });
+    return;
+  }
+
   if (url === "/api/notifications/unsubscribe") {
     const endpoint = (body as { endpoint?: unknown })?.endpoint;
     if (typeof endpoint !== "string") {
@@ -358,7 +374,10 @@ function handleRequest(req: http.IncomingMessage, res: http.ServerResponse): voi
 
   // Read-only service: nothing here should ever accept a write.
   // Subscribing is the single exception to an otherwise read-only service.
-  const writable = url === "/api/notifications/subscribe" || url === "/api/notifications/unsubscribe";
+  const writable =
+    url === "/api/notifications/subscribe" ||
+    url === "/api/notifications/unsubscribe" ||
+    url === "/api/notifications/ack";
   if (req.method === "POST" && writable) {
     void handleNotificationWrite(url, req, res);
     return;
