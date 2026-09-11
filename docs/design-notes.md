@@ -170,8 +170,11 @@ opponent is a bigger story than an excellent Sun Belt game. Broadcast slot feeds
 networks allocate their best inventory to the games they expect to draw, so ABC and NBC rate far
 above ESPN+.
 
-Pregame `anticipation` inverts that and takes the **worse** of the two teams, because planning an
-evening around a mismatch is a bad idea however good the favourite is.
+Pregame `anticipation` is driven mostly by the spread, because nothing computed here beats the
+market at predicting a close game. It inverts prominence and takes the **worse** of the two
+teams, because planning an evening around a mismatch is a bad idea however good the favourite is.
+A 45-38 college shootout and a 27-24 NFL game are not the same event, which is why the two
+leagues are calibrated separately rather than sharing one scale.
 
 `upset` uses the **pregame closing line**, not the ranking gap. Rank cannot tell a 27-point
 mismatch from a coin flip and both can look like "ranked versus unranked". A live line is no good
@@ -213,7 +216,10 @@ CFB  n=60   top 87.8   median 45.4   low 38.4
 ```
 
 College is bimodal: two genuinely great games, a cliff, then 46 of 60 below 55. The NFL is flat,
-with 12 of 15 between 55 and 75.
+with 12 of 15 between 55 and 75. A 30-team league with a salary cap produces a uniformly
+competitive slate; a 130-team one produces a few marquee games and a lot of filler. The live
+score runs higher than pregame `anticipation` on the same game, since closeness-and-lateness
+dominates once the clock starts, so a 70 pregame can become a 90.
 
 ## Working out which games a viewer can actually watch
 

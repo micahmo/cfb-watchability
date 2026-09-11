@@ -7,8 +7,7 @@ currently a one-score fight with four minutes left. This polls the public ESPN s
 ranks every in-progress game by how good it is at this moment, then ranks the week ahead by how
 much each matchup is worth planning around.
 
-Covers the **NFL** and **college football**, on separate tabs with separately calibrated
-models, because a 45-38 college shootout and a 27-24 NFL game are not the same event.
+Covers the **NFL** and **college football** on separate tabs, each with its own calibration.
 
 No API key, no account, no database.
 
@@ -17,9 +16,8 @@ No API key, no account, no database.
 | **NFL** | <img src="docs/nfl-live.png" width="330" alt="Live NFL board"> | <img src="docs/nfl-upcoming.png" width="330" alt="Upcoming NFL games grouped by day"> |
 | **College** | <img src="docs/cfb-live.png" width="330" alt="Live college board"> | <img src="docs/cfb-upcoming.png" width="330" alt="Upcoming college games grouped by day"> |
 
-<sub>Teams, lines, networks and listings are real. Scores, clocks and records in the live shots are
-fabricated, because a live board only exists while games are being played. See
-<a href="docs/design-notes.md">design notes</a> for how these are regenerated.</sub>
+<sub>Teams, lines, networks and listings are real; scores, clocks and records in the live shots are
+fabricated. <a href="docs/design-notes.md">Design notes</a> cover how these are regenerated.</sub>
 
 ## What the board shows
 
@@ -71,8 +69,7 @@ The components are the same for both leagues; what feeds them is not.
 | `stakes` | Both ranked, both top-10, conference game | Division game, both contenders, both winning |
 | `pace` | Scaled around a 55-point total | Scaled around a 45-point total |
 
-Upcoming games get a separate `anticipation` rating driven mostly by the spread, since nothing
-here beats the market at predicting a close game.
+Upcoming games get a separate `anticipation` rating, driven mostly by the spread.
 
 Why each term is shaped the way it is, and the games that forced those decisions, are in
 [docs/design-notes.md](docs/design-notes.md).
@@ -86,10 +83,9 @@ Why each term is shaped the way it is, and the games that forced those decisions
 | 55-69 | Worth having on |
 | under 55 | Background noise |
 
-Read each tab against itself: a 30-team league with a salary cap produces a flat, uniformly
-competitive slate, a 130-team one produces a few marquee games and a lot of filler. Pregame
-`anticipation` and the live score are also different scales, and a 70 pregame can become a 90
-once it kicks off, which is why `TURN THIS ON` fires at 75 live.
+Read each tab against itself; the two leagues produce different distributions. Pregame
+`anticipation` and the live score are different scales too. On the live board, `TURN THIS ON`
+fires at 75.
 
 ## Can I actually watch it
 
