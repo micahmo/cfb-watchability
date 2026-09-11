@@ -463,6 +463,38 @@ The general lesson is about porting: the mechanism moved across cleanly but its 
 not, and nothing complained. A trigger that relies on an outage is only reliable where an outage
 is guaranteed.
 
+## ESPN has a push feed, and it is reachable
+
+There are no webhooks, but ESPN runs **FastCast**, the websocket service its own site uses for
+live scores. It is undocumented, like every other endpoint this project uses, and it works:
+
+```
+1. GET  https://fastcast.semfs.engsvc.go.com/public/websockethost
+        -> {"ip": "pe<uuid>-<ip>.fastcast.semfs.engsvc.go.com", "securePort": 9573, "token": "..."}
+2. WS   wss://{ip}:{securePort}/FastcastService/pubsub/profiles/12000?TrafficManager-Token={token}
+3. send {"op":"C"}                                     -> {"rc":200,"hbi":30,"sid":"..."}
+4. send {"op":"S","sid":sid,"tc":"scoreboard-football-nfl"}  -> {"rc":200}
+5. receive {"op":"P","tc":...,"pl":...} pushes; {"op":"B"} is the heartbeat
+```
+
+Two details cost time. Node's built-in `WebSocket` fails the upgrade; a manual handshake over
+`https.request` succeeds, with or without an `Origin` header. And the path is right even when it
+returns 404 to a plain GET: `{"rc":404,"op":"ERROR"}` with a `Server: Fastcast/4.1.26` header is
+the service saying "that was not an upgrade request", whereas an unrecognised path returns an
+empty 404. That distinction is what located the correct path.
+
+Valid topic found: `scoreboard-football-nfl`. Per-event names of the shape `gp-football-nfl-<id>`
+and `event-<id>` are all rejected, so the scoreboard topic appears to be the unit.
+
+**Unverified:** what the pushes actually contain. Nothing was live when this was probed, so the
+pipe is proven and the payload is not. `pl` is expected to be base64'd gzip. Capture a few during
+a live window before building anything on it.
+
+This also settles the SSE question, which was previously "no". That answer assumed the server
+stays 30 seconds behind ESPN, which makes pushing to the client pointless. The two go together:
+FastCast without SSE mostly wastes the freshness, and SSE without FastCast is a 20-second
+improvement on a 50-second problem. Either both, or neither.
+
 ## Regenerating the screenshots
 
 The README shows four panels: live and upcoming, for each league. Only the upcoming pair can be
