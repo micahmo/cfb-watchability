@@ -5,6 +5,8 @@ import { fileURLToPath } from "node:url";
 import { LeaguePoller } from "./poller.js";
 import { StandingsStore } from "./standings.js";
 import { ListingsStore } from "./listings.js";
+import { SubscriptionStore, CATEGORIES, type Category } from "./subscriptions.js";
+import { AlertEngine } from "./alerts.js";
 import type { Game, League, Snapshot } from "../shared/types.js";
 
 const PORT = Number(process.env.PORT ?? 8787);
@@ -20,13 +22,34 @@ const distDir = process.env.DIST_DIR
 
 const standings = new StandingsStore();
 const listings = new ListingsStore();
+/** Notifications are the one feature that needs somewhere durable to live. */
+const subscriptions = new SubscriptionStore(process.env.NOTIFY_DIR);
+const alerts = new AlertEngine(subscriptions);
 
 /** Each league polls independently, so a quiet NFL week cannot slow a busy Saturday. */
+/**
+ * Evaluates a fresh snapshot for alerts, giving each subscriber the board as they
+ * would see it so availability and favourites are resolved per person.
+ */
+function onSnapshot(snapshot: Snapshot): void {
+  if (!subscriptions.available) return;
+  void alerts
+    .evaluate(snapshot, async (sub) =>
+      sub.zip !== null && snapshot.league === "nfl"
+        ? await withMarket(snapshot, sub.zip, false, null)
+        : snapshot,
+    )
+    .then((sent) => {
+      if (sent > 0) console.log(`[notify] sent ${sent} notification(s) for ${snapshot.league}`);
+    })
+    .catch((err) => console.error(`[notify] failed: ${err instanceof Error ? err.message : err}`));
+}
+
 const pollers: Record<League, LeaguePoller> = {
-  cfb: new LeaguePoller("cfb"),
+  cfb: new LeaguePoller("cfb", null, onSnapshot),
   // Divisions and playoff seeds are not on the scoreboard, so NFL games get
   // decorated from the standings feed before scoring.
-  nfl: new LeaguePoller("nfl", (games) => standings.enrich(games)),
+  nfl: new LeaguePoller("nfl", (games) => standings.enrich(games), onSnapshot),
 };
 
 const DEFAULT_LEAGUE: League = "nfl";
@@ -110,6 +133,72 @@ async function withMarket(
   };
 }
 
+/**
+ * Reads a JSON body, refusing anything oversized.
+ *
+ * This is the only write path in an otherwise read-only service, so it gets a
+ * hard cap rather than trusting content-length, which a client controls.
+ */
+const MAX_BODY_BYTES = 8 * 1024;
+
+function readJson(req: http.IncomingMessage): Promise<unknown> {
+  return new Promise((resolve, reject) => {
+    let size = 0;
+    const chunks: Buffer[] = [];
+    req.on("data", (chunk: Buffer) => {
+      size += chunk.length;
+      if (size > MAX_BODY_BYTES) {
+        // Stop reading but leave the socket alive, so the caller still gets a
+        // reply. Destroying it here means an oversized request looks to the
+        // client like the server simply hung up.
+        req.pause();
+        reject(new Error("body too large"));
+        return;
+      }
+      chunks.push(chunk);
+    });
+    req.on("end", () => {
+      try {
+        resolve(JSON.parse(Buffer.concat(chunks).toString("utf8")));
+      } catch {
+        reject(new Error("invalid json"));
+      }
+    });
+    req.on("error", reject);
+  });
+}
+
+/** Nothing from a browser is trusted; every field is checked and rebuilt. */
+function parseSubscription(body: unknown): Parameters<SubscriptionStore["upsert"]>[0] | null {
+  const b = body as Record<string, any> | null;
+  const endpoint = b?.endpoint;
+  const p256dh = b?.keys?.p256dh;
+  const auth = b?.keys?.auth;
+  if (typeof endpoint !== "string" || !/^https:\/\//.test(endpoint) || endpoint.length > 1024) {
+    return null;
+  }
+  if (typeof p256dh !== "string" || typeof auth !== "string") return null;
+  if (p256dh.length > 256 || auth.length > 256) return null;
+
+  const wants: Record<League, Category[]> = { nfl: [], cfb: [] };
+  for (const league of ["nfl", "cfb"] as League[]) {
+    const raw = Array.isArray(b?.wants?.[league]) ? b.wants[league] : [];
+    wants[league] = CATEGORIES.filter((c) => raw.includes(c));
+  }
+  if (wants.nfl.length === 0 && wants.cfb.length === 0) return null;
+
+  const favourites: Record<League, string[]> = { nfl: [], cfb: [] };
+  for (const league of ["nfl", "cfb"] as League[]) {
+    const raw = Array.isArray(b?.favourites?.[league]) ? b.favourites[league] : [];
+    favourites[league] = raw
+      .filter((x: unknown) => typeof x === "string" && x.length <= 40)
+      .slice(0, 20);
+  }
+
+  const zip = typeof b?.zip === "string" && /^\d{5}$/.test(b.zip) ? b.zip : null;
+  return { endpoint, keys: { p256dh, auth }, wants, zip, favourites };
+}
+
 function leagueFrom(url: string): League {
   const value = new URL(url, "http://localhost").searchParams.get("league");
   return value === "nfl" || value === "cfb" ? value : DEFAULT_LEAGUE;
@@ -172,14 +261,73 @@ const server = http.createServer((req, res) => {
   }
 });
 
+function json(res: http.ServerResponse, body: unknown, status = 200): void {
+  res.writeHead(status, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
+  res.end(JSON.stringify(body));
+}
+
+async function handleNotificationWrite(
+  url: string,
+  req: http.IncomingMessage,
+  res: http.ServerResponse,
+): Promise<void> {
+  if (!subscriptions.available) {
+    json(res, { error: "notifications are not configured" }, 503);
+    return;
+  }
+  let body: unknown;
+  try {
+    body = await readJson(req);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "bad request";
+    json(res, { error: message }, message === "body too large" ? 413 : 400);
+    req.destroy();
+    return;
+  }
+
+  if (url === "/api/notifications/unsubscribe") {
+    const endpoint = (body as { endpoint?: unknown })?.endpoint;
+    if (typeof endpoint !== "string") {
+      json(res, { error: "endpoint required" }, 400);
+      return;
+    }
+    subscriptions.remove(endpoint);
+    json(res, { ok: true });
+    return;
+  }
+
+  const parsed = parseSubscription(body);
+  if (parsed === null) {
+    json(res, { error: "invalid subscription" }, 400);
+    return;
+  }
+  subscriptions.upsert(parsed);
+  json(res, { ok: true });
+}
+
 function handleRequest(req: http.IncomingMessage, res: http.ServerResponse): void {
   const raw = req.url ?? "/";
   const url = raw.split("?")[0];
 
   // Read-only service: nothing here should ever accept a write.
+  // Subscribing is the single exception to an otherwise read-only service.
+  const writable = url === "/api/notifications/subscribe" || url === "/api/notifications/unsubscribe";
+  if (req.method === "POST" && writable) {
+    void handleNotificationWrite(url, req, res);
+    return;
+  }
   if (req.method !== "GET" && req.method !== "HEAD") {
     res.writeHead(405, { "content-type": "text/plain", allow: "GET, HEAD" });
     res.end("Method not allowed");
+    return;
+  }
+
+  if (url === "/api/notifications/config") {
+    json(res, {
+      available: subscriptions.available,
+      publicKey: subscriptions.publicKey,
+      categories: CATEGORIES,
+    });
     return;
   }
 

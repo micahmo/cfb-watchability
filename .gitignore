@@ -26,3 +26,6 @@ dist-ssr
 
 # Scratch analysis scripts
 /*.mjs
+
+# Local notification store: contains the VAPID private key
+.notify/

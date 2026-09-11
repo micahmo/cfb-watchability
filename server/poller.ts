@@ -69,9 +69,17 @@ export class LeaguePoller {
 
   snapshot: Snapshot;
 
-  constructor(league: League, enrich: Enricher | null = null) {
+  /** Notified after every successful poll, so alerts see each new snapshot once. */
+  private readonly onSnapshot: ((snapshot: Snapshot) => void) | null;
+
+  constructor(
+    league: League,
+    enrich: Enricher | null = null,
+    onSnapshot: ((snapshot: Snapshot) => void) | null = null,
+  ) {
     this.league = league;
     this.enrich = enrich;
+    this.onSnapshot = onSnapshot;
     this.snapshot = {
       league,
       updatedAt: new Date(0).toISOString(),
@@ -268,6 +276,12 @@ export class LeaguePoller {
         market: null,
         error: null,
       };
+      // After the snapshot is in place, so anything reading it sees the new one.
+      try {
+        this.onSnapshot?.(this.snapshot);
+      } catch (err) {
+        console.error(`[${this.tag()}] snapshot hook failed: ${err instanceof Error ? err.message : err}`);
+      }
       console.log(
         `[${this.tag()}] ${new Date(now).toLocaleTimeString()} live=${live.length} upcoming=${upcoming.length} recent=${recent.length}` +
           (live[0] ? ` top="${live[0].shortName}" ${live[0].score?.total}` : ""),

@@ -73,3 +73,49 @@ self.addEventListener("fetch", (event) => {
       .catch(() => caches.match(request).then((hit) => hit ?? caches.match("/index.html"))),
   );
 });
+
+/**
+ * Push notifications.
+ *
+ * The payload is built server side so the wording can depend on things only the
+ * server knows: how many other games are live, and whether this viewer's own
+ * market is carrying the game. The worker just renders it.
+ */
+self.addEventListener("push", (event) => {
+  if (!event.data) return;
+  let payload;
+  try {
+    payload = event.data.json();
+  } catch {
+    return;
+  }
+  const { title, body, league, gameId, category } = payload;
+  if (!title) return;
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body: body ?? "",
+      icon: "/icon-192.png",
+      badge: "/icon-192.png",
+      // One notification per game: a later alert about the same game replaces the
+      // earlier one rather than stacking a second buzz for the same thing.
+      tag: gameId ? `game-${gameId}` : undefined,
+      renotify: true,
+      data: { league, gameId, category },
+    }),
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const league = event.notification.data?.league;
+  const url = league ? `/?league=${league}` : "/";
+  // Focus an open board rather than opening a second copy of it.
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
+      for (const client of clients) {
+        if (client.url.includes(self.location.origin)) return client.focus();
+      }
+      return self.clients.openWindow(url);
+    }),
+  );
+});
