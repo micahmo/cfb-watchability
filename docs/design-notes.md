@@ -284,8 +284,18 @@ Two details were learned the hard way and are worth keeping:
   there is nonsense, the model correctly screams `UPSET ALERT` at every card, and the picture
   stops describing a normal Saturday. The pool is now filtered to games inside ten points, ranked
   teams first.
-- **Records have to be invented too.** In week one every team is 0-0, and a board full of `0-0`
-  photographs as broken rather than as representative.
+- **Records have to be invented too, and plausibly.** In week one every team is 0-0, and a board
+  full of `0-0` photographs as broken. But handing them out by position in the list produced a
+  4-1 Titans and pushed Bills at Texans down the board. A reader does not know the records are
+  props: they see the app rating a bad matchup over a good one and conclude it cannot judge
+  football. NFL records now scale a published set of full-season predictions down to five games;
+  college derives them from the AP rank already on the card, so a number one seed never appears
+  at 3-2.
+- **The drama has to land on a game that deserves it.** Situations are assigned in order and the
+  first is a one-score game inside two minutes, which tops the board whatever it is attached to.
+  Attached to the tightest line on the slate it gave a hero card of 1-4 Jets at 2-3 Titans:
+  correct by the model, and a poor advertisement for it. The pool is ordered by matchup quality
+  first, so the hero is a game a reader would agree earned it.
 
 The postal code in the shots is `10001`, deliberately generic. The feature is worth showing but a
 README is a public page.

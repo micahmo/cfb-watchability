@@ -33,26 +33,43 @@ const mode = process.argv.includes("--mode")
   : "live";
 
 /**
- * Fixed so a re-run produces the same pictures, rather than a new slate each time.
- * Six games so the "also live" count reads as a real slate. Only the top of the
- * board is in frame, but the count is not.
- * Records are invented too: the real slate is week one, where every team is 0-0,
- * and a board full of "0-0" photographs as broken rather than as representative.
+ * Records, five games into a season.
+ *
+ * Not arbitrary, and this matters more than it looks. The first version handed
+ * out records by position in the list, which produced a 4-1 Titans and pushed
+ * Bills at Texans down the board. A reader does not know the records are props:
+ * they see the app rating a bad matchup over a good one and conclude it cannot
+ * judge football. Fabricated inputs have to be plausible ones or the screenshot
+ * argues against the thing it is advertising.
+ *
+ * Full-season win totals are Conor Orr's 2026 predictions for SI, scaled to five
+ * games. College is derived from the AP rank on the card instead, so a number one
+ * seed does not appear at 3-2.
  */
-const RECORDS = [
-  ["4-1", 0.8],
-  ["3-2", 0.6],
-  ["2-3", 0.4],
-  ["4-1", 0.8],
-  ["3-2", 0.6],
-  ["1-4", 0.2],
-  ["5-0", 1.0],
-  ["2-3", 0.4],
-  ["3-2", 0.6],
-  ["4-1", 0.8],
-  ["2-3", 0.4],
-  ["3-2", 0.6],
-];
+const NFL_WINS_2026 = {
+  BUF: 10, NE: 9, MIA: 5, NYJ: 4, BAL: 11, CIN: 9, PIT: 6, CLE: 5,
+  HOU: 13, JAX: 9, TEN: 6, IND: 6, LAC: 11, DEN: 10, KC: 9, LV: 5,
+  DAL: 12, PHI: 9, WSH: 9, WAS: 9, NYG: 6, DET: 14, GB: 10, CHI: 10,
+  MIN: 9, CAR: 10, TB: 7, ATL: 6, NO: 6, LAR: 13, SEA: 11, SF: 10, ARI: 2,
+};
+
+const GAMES_IN = 5;
+
+function recordFor(league, team) {
+  let wins;
+  if (league === "nfl") {
+    const season = NFL_WINS_2026[team.abbrev];
+    wins = season === undefined ? 2 : Math.round((season / 17) * GAMES_IN);
+  } else if (team.rank !== null) {
+    // Top of the poll is undefeated or close; the tail of it has a loss or two.
+    wins = team.rank <= 5 ? GAMES_IN : team.rank <= 12 ? 4 : 4;
+  } else {
+    wins = 2;
+  }
+  wins = Math.max(0, Math.min(GAMES_IN, wins));
+  return [`${wins}-${GAMES_IN - wins}`, wins / GAMES_IN];
+}
+
 const SITUATIONS = [
   { period: 4, clock: 96, home: 27, away: 24, wp: 0.52, down: "3rd & 4 at 38", red: false },
   { period: 4, clock: 214, home: 31, away: 28, wp: 0.44, down: "2nd & 7 at 45", red: false },
@@ -61,6 +78,24 @@ const SITUATIONS = [
   { period: 4, clock: 631, home: 17, away: 14, wp: 0.55, down: "3rd & 8 at 33", red: false },
   { period: 3, clock: 122, home: 24, away: 23, wp: 0.47, down: "1st & 10 at 50", red: false },
 ];
+
+/**
+ * Best matchup first, so the most dramatic situation lands on it.
+ *
+ * The situations are assigned in order, and the first is a one-score game inside
+ * two minutes, which will top the board whatever it is attached to. Attached to
+ * the tightest line on the slate it produced a hero card of 1-4 Jets at 2-3
+ * Titans: correct by the model, and a poor advertisement for it. A reader
+ * judging a screenshot is judging the app's taste, so the drama goes to a game
+ * they would agree deserves it.
+ */
+function quality(league, game) {
+  if (league === "nfl") {
+    return (NFL_WINS_2026[game.home.abbrev] ?? 6) + (NFL_WINS_2026[game.away.abbrev] ?? 6);
+  }
+  const rank = (side) => (side.rank === null ? 0 : 26 - side.rank);
+  return rank(game.home) + rank(game.away);
+}
 
 function clockLabel(seconds) {
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
@@ -78,16 +113,13 @@ async function liveSlate(league) {
    */
   const pool = games
     .filter((g) => g.state === "pre" && g.homeSpread !== null && Math.abs(g.homeSpread) <= 10)
-    .sort((a, b) => {
-      const ranked = (g) => Number(g.home.rank !== null) + Number(g.away.rank !== null);
-      return ranked(b) - ranked(a) || Math.abs(a.homeSpread) - Math.abs(b.homeSpread);
-    })
+    .sort((a, b) => quality(league, b) - quality(league, a) || Math.abs(a.homeSpread) - Math.abs(b.homeSpread))
     .slice(0, SITUATIONS.length);
 
   return pool.map((raw, i) => {
     const s = SITUATIONS[i % SITUATIONS.length];
-    const [homeRecord, homeWinPct] = RECORDS[(i * 2) % RECORDS.length];
-    const [awayRecord, awayWinPct] = RECORDS[(i * 2 + 1) % RECORDS.length];
+    const [homeRecord, homeWinPct] = recordFor(league, raw.home);
+    const [awayRecord, awayWinPct] = recordFor(league, raw.away);
     const game = {
       ...raw,
       state: "in",
