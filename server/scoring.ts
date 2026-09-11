@@ -208,18 +208,30 @@ export function stakesScore(
  * rate is shrunk toward a prior, which is the pregame over/under when we have one,
  * weighted by how much of the game has actually been played.
  */
-const DEFAULT_EXPECTED_TOTAL = 55;
+/**
+ * Scoring expectations differ by league, so the pace term has to be normalised
+ * against each one. College totals run roughly 43 to 67; NFL totals run roughly
+ * 38 to 52. Scoring both on the college scale means no NFL game can ever clear
+ * 0.38 on pace, which is a penalty for being the NFL rather than a judgement
+ * about the game.
+ */
+const PACE_SCALE: Record<League, { floor: number; span: number; typical: number }> = {
+  cfb: { floor: 35, span: 35, typical: 55 },
+  nfl: { floor: 28, span: 26, typical: 45 },
+};
 
 export function paceScore(
+  league: League,
   totalPoints: number,
   progress: number,
   overUnder: number | null = null,
 ): number {
-  const prior = overUnder ?? DEFAULT_EXPECTED_TOTAL;
-  if (progress < 0.08) return clamp((prior - 35) / 35);
+  const { floor, span, typical } = PACE_SCALE[league];
+  const prior = overUnder ?? typical;
+  if (progress < 0.08) return clamp((prior - floor) / span);
   const observed = totalPoints / progress;
   const projected = prior * (1 - progress) + observed * progress;
-  return clamp((projected - 35) / 35);
+  return clamp((projected - floor) / span);
 }
 
 /**
@@ -337,7 +349,7 @@ export function scoreGame(input: ScoreInputs): ScoreBreakdown {
     swing: swingScore(input.swingMovement),
     upset: combinedUpset(input, progress),
     stakes: stakesScore(input.league, input.home, input.away, input.conferenceGame, input.divisionGame),
-    pace: paceScore(totalPoints, progress, input.overUnder),
+    pace: paceScore(input.league, totalPoints, progress, input.overUnder),
   };
 
   // A four-score game in the fourth quarter is over regardless of what the
@@ -357,7 +369,7 @@ export function scoreGame(input: ScoreInputs): ScoreBreakdown {
  * the board, and the game has to be close. A blowout piles up points too, and
  * "on pace for" means nothing in the first quarter.
  */
-const SHOOTOUT_MIN_POINTS = 52;
+const SHOOTOUT_MIN_POINTS: Record<League, number> = { cfb: 52, nfl: 48 };
 const SHOOTOUT_MAX_MARGIN = 10;
 
 /** Beating the closing line by three touchdowns is a maximal upset. */
@@ -442,7 +454,7 @@ export function buildTags(game: Game, breakdown: ScoreBreakdown): string[] {
   // is expected to appear and fade as a game settles. A permanent "wild game"
   // badge would point you at games that have since stopped being close.
   if (breakdown.swing >= 0.6) tags.push("RECENT SWINGS");
-  if (game.totalPoints >= SHOOTOUT_MIN_POINTS && game.margin <= SHOOTOUT_MAX_MARGIN) {
+  if (game.totalPoints >= SHOOTOUT_MIN_POINTS[game.league] && game.margin <= SHOOTOUT_MAX_MARGIN) {
     tags.push("SHOOTOUT");
   }
   if (hr <= 10 && ar <= 10) tags.push("TOP-10 CLASH");
@@ -514,7 +526,7 @@ export function anticipationScore(i: AnticipationInputs): number {
     network: i.network,
     startDate: i.startDate,
   });
-  const pace = i.overUnder === null ? 0.3 : clamp((i.overUnder - 40) / 30);
+  const pace = paceScore(i.league, 0, 0, i.overUnder);
   const conference = i.league === "nfl" ? (i.divisionGame ? 1 : 0) : i.conferenceGame ? 1 : 0;
 
   const total =
