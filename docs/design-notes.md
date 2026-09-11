@@ -161,3 +161,50 @@ Sorting, the hero pick, the "also live" list and the effect of the weight profil
 are all unvalidated against a real slate. Worth watching on a full Saturday: 41% of polls
 cleared 55 with a single merely-decent game, which suggests the scale may be generous once
 forty games are live.
+
+## Regenerating the screenshots
+
+The README shows four panels: live and upcoming, for each league. Only the upcoming pair can be
+photographed from the real board, because a live board only exists while games are being played,
+and waiting for a Sunday to document a UI change is not a workflow. The alternative, shipping
+stale images, is what actually happened: the original pair went three features out of date before
+anyone noticed, still showing a college-only app with no league tabs, favourites or market
+control.
+
+So the live pair is fabricated, carefully. Teams, records, lines, networks and listings come from
+the real ESPN slate. Only the scores, clocks and situations are invented, and the ratings on the
+cards are produced by importing the real scoring model rather than being typed in, so a
+screenshot can never show a number the board would not itself produce.
+
+Two details were learned the hard way and are worth keeping:
+
+- **The fabricated game has to fit its real line.** The first attempt took the first six games on
+  the slate, which in week one are FCS visitors at 45-point underdogs. A 24-23 fourth quarter
+  there is nonsense, the model correctly screams `UPSET ALERT` at every card, and the picture
+  stops describing a normal Saturday. The pool is now filtered to games inside ten points, ranked
+  teams first.
+- **Records have to be invented too.** In week one every team is 0-0, and a board full of `0-0`
+  photographs as broken rather than as representative.
+
+The postal code in the shots is `10001`, deliberately generic. The feature is worth showing but a
+README is a public page.
+
+```bash
+npm run build
+PORT=8790 DIST_DIR=dist node dist-server/server/index.js &   # upcoming shots read the real board
+
+node scripts/mock-board.mjs --mode live &
+node scripts/capture-screens.mjs live
+
+node scripts/mock-board.mjs --mode upcoming &
+node scripts/capture-screens.mjs upcoming
+```
+
+Headless Chromium comes from Playwright, a dev dependency, rather than a browser already on the
+machine. Edge here writes no file at all and reports no error, headless or not. Firefox does work
+but shares process space with whatever the user has open, and filtering its processes by start
+time to clean up kills content processes belonging to their real session.
+
+**Regenerate whenever the board's layout or chrome changes**: the header and controls, the card
+or row structure, the tag set, or anything that changes what a glance at the board looks like. A
+scoring tweak that only moves numbers does not need new pictures.
