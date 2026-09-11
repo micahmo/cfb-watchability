@@ -3,7 +3,7 @@
   import { DEFAULT_PROFILE, PROFILES, combine } from "../shared/weights";
   import { fetchSnapshot } from "./lib/api";
   import { dayDate, dayKey, dayLabel, relativeTime, scoreColor } from "./lib/format";
-  import { isFavourite, prefs } from "./lib/prefs.svelte";
+  import { isFavourite, prefs, setUpcomingOrder } from "./lib/prefs.svelte";
   import LeagueTabs from "./lib/LeagueTabs.svelte";
   import FavouriteConferences from "./lib/FavouriteConferences.svelte";
   import MarketPicker from "./lib/MarketPicker.svelte";
@@ -196,7 +196,18 @@
       .sort(([a], [b]) => a.localeCompare(b))
       .slice(0, MAX_DAYS)
       .map(([key, games]) => {
-        const ranked = [...games].sort(byWatchableThen(anticipationOf));
+        // Games the market is not carrying stay at the bottom either way: the
+        // question "what is on next" only means the ones you could actually put
+        // on. Sorting by time alone is enough to keep the best game first within
+        // a kickoff slot, because the list arrives ranked and sort is stable.
+        const ranked =
+          prefs.upcomingOrder === "time"
+            ? [...games].sort(
+                (a, b) =>
+                  Number(watchable(b)) - Number(watchable(a)) ||
+                  Date.parse(a.startDate) - Date.parse(b.startDate),
+              )
+            : [...games].sort(byWatchableThen(anticipationOf));
         const showAll = expanded[key] === true;
         const shown = showAll ? ranked : ranked.slice(0, MAX_PER_DAY);
         return {
@@ -300,7 +311,20 @@
 <div class="two-col">
   {#if upcomingByDay.length}
     <section>
-      <h2 class="section-head">Worth planning around</h2>
+      <h2 class="section-head">
+        Worth planning around
+        <span class="order">
+          <button
+            type="button"
+            class:on={prefs.upcomingOrder === "rank"}
+            onclick={() => setUpcomingOrder("rank")}>Best</button
+          ><button
+            type="button"
+            class:on={prefs.upcomingOrder === "time"}
+            onclick={() => setUpcomingOrder("time")}>Time</button
+          >
+        </span>
+      </h2>
       {#each upcomingByDay as day (day.key)}
         <div class="day-group">
           <h3 class="day-head">
@@ -470,6 +494,31 @@
   .pill.hot {
     background: rgba(255, 77, 79, 0.1);
     opacity: 1;
+  }
+  /* Sits in the heading rather than the top controls row: it changes this list
+     only, and putting it here keeps it next to what it affects. */
+  .order {
+    margin-left: auto;
+    display: inline-flex;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    overflow: hidden;
+  }
+  .order button {
+    background: none;
+    border: none;
+    color: var(--text-faint);
+    font: inherit;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 4px 9px;
+    cursor: pointer;
+  }
+  .order button.on {
+    background: var(--bg-card-hi, var(--bg-raised));
+    color: var(--text);
   }
   .section-head {
     font-size: 12px;

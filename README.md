@@ -28,9 +28,10 @@ No API key, no account, no database.
 situation, who has the ball, the network, the pregame line, and any tags that apply:
 `GAME ON THE LINE`, `UPSET ALERT`, `RECENT SWINGS`, `INSTANT CLASSIC`, `OVERTIME`.
 
-**Worth planning around**, grouped by day, days in order, games ranked within each day, so an
-earlier day's games are never buried under a better game later in the week. Each row shows
-kickoff time, the line, the over/under and the network.
+**Worth planning around**, grouped by day, days in order, so an earlier day's games are never
+buried under a better game later in the week. Within a day, **Best** ranks by rating and **Time**
+runs chronologically, for reading the day in order and seeing which slots are worth it. Each row
+shows kickoff time, the line, the over/under and the network.
 
 **Just finished**, the recent recap, best first. Games stay on the board for eighteen hours.
 

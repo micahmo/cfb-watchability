@@ -20,6 +20,11 @@ export interface Prefs {
   marketOff: boolean;
   /** Alert categories per league. Empty everywhere means notifications are off. */
   alerts: Record<League, Category[]>;
+  /**
+   * How the planning list is ordered within a day. Ranked answers "what is worth
+   * my evening", chronological answers "what is on next and is it any good".
+   */
+  upcomingOrder: "rank" | "time";
 }
 
 const DEFAULTS: Prefs = {
@@ -28,6 +33,7 @@ const DEFAULTS: Prefs = {
   zip: null,
   marketOff: false,
   alerts: { nfl: [], cfb: [] },
+  upcomingOrder: "rank",
 };
 
 function load(): Prefs {
@@ -60,6 +66,11 @@ export function persist(): void {
 export function setZip(zip: string): void {
   prefs.zip = /^\d{5}$/.test(zip) ? zip : null;
   prefs.marketOff = false;
+  persist();
+}
+
+export function setUpcomingOrder(order: Prefs["upcomingOrder"]): void {
+  prefs.upcomingOrder = order;
   persist();
 }
 
