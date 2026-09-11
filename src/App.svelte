@@ -378,14 +378,16 @@
      about. Scoped under .panel to outrank ".panel p", which sets card body text
      to 13px and was silently winning against a bare .cutoff. */
   .panel .cutoff {
-    /* Its own row in the list, with the divider above it rather than inherited
-       from the row before. The available rows are wrapped so the last one drops
-       its bottom border, which leaves exactly one line here and no gap to pad
-       around: the header reads as starting a section instead of captioning the
-       entry beneath it. */
+    /* Bounded top and bottom, so it is an entry in the list rather than the top
+       of the entry below it. A single rule above was not enough: it left the
+       header and the first unavailable row sharing one cell, which is the thing
+       that kept reading wrong. Every other row here is delimited by lines, so a
+       header has to be too. The available rows are wrapped so the last one drops
+       its own bottom border, which keeps this to one line rather than two. */
     margin: 0;
-    padding: 11px 4px 7px;
+    padding: 9px 4px;
     border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
     font-size: 10px;
     text-transform: uppercase;
     letter-spacing: 0.1em;
