@@ -320,7 +320,7 @@
             </div>
             {#if day.unavailable.length > 0}
               <div class="blocked">
-                <p class="cutoff">not on your channels</p>
+                <p class="cutoff"><span class="down" aria-hidden="true">&darr;</span> not on your channels</p>
                 {#each day.unavailable as game (game.id)}
                   <UpcomingRow {game} score={anticipationOf(game)} />
                 {/each}
@@ -392,6 +392,12 @@
     text-transform: uppercase;
     letter-spacing: 0.1em;
     color: var(--text-faint);
+  }
+  /* Points at what the header is about. A caret would read as a dropdown, which
+     is what it means everywhere else on this page. */
+  .panel .cutoff .down {
+    margin-right: 2px;
+    opacity: 0.8;
   }
   .controls-row {
     display: flex;
