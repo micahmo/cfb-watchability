@@ -113,6 +113,17 @@ function detectedZip(req: http.IncomingMessage): string | null {
  * asking: two people on the same board in different cities get different games
  * out of the same slate.
  */
+/**
+ * How long the board will wait for the market lookup before serving without it.
+ *
+ * The listings fetch has its own generous timeout and may cover several kickoff
+ * windows, so a slow upstream could hold the snapshot request open for a minute
+ * or more. That turns a cosmetic annotation into an outage: the board stops
+ * answering at all. It is cached, so giving up here costs nothing but a plain
+ * board on the first request while the lookup finishes in the background.
+ */
+const MARKET_BUDGET_MS = 3000;
+
 async function withMarket(
   snapshot: Snapshot,
   zip: string,
@@ -358,12 +369,12 @@ function handleRequest(req: http.IncomingMessage, res: http.ServerResponse): voi
     // Only the NFL splits a slate by market; college games are on cable.
     const ready =
       zip !== null && league === "nfl"
-        ? withMarket(
-            base,
-            zip,
-            chosen === null,
-            chosen === null ? detectedCity(req) : null,
-          )
+        ? Promise.race([
+            withMarket(base, zip, chosen === null, chosen === null ? detectedCity(req) : null),
+            new Promise<Snapshot>((resolve) =>
+              setTimeout(() => resolve(base), MARKET_BUDGET_MS),
+            ),
+          ])
         : Promise.resolve(base);
     void ready
       .catch((err) => {

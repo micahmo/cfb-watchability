@@ -10,6 +10,7 @@
   import AlertsPicker from "./lib/AlertsPicker.svelte";
   import UpdatePrompt from "./lib/UpdatePrompt.svelte";
   import { checkForUpdateNow } from "./lib/appUpdate";
+  import { setKeepAwake } from "./lib/keepAwake";
   import GameCard from "./lib/GameCard.svelte";
   import UpcomingRow from "./lib/UpcomingRow.svelte";
 
@@ -27,6 +28,20 @@
    * that is a flex sibling of its own button wedges the row apart when it opens.
    */
   let openPanel = $state<"favourites" | "market" | "alerts" | null>(null);
+
+  /**
+   * The last market the board resolved, kept across tab switches.
+   *
+   * `snapshot.market` is null on the college tab, because splitting a slate by
+   * market is an NFL-only problem. Reading it directly meant a subscription made
+   * from the college tab registered no market at all, which silently disabled the
+   * one gate that stops alerts for games you cannot watch.
+   */
+  let lastMarketZip = $state<string | null>(null);
+  $effect(() => {
+    const zip = snapshot?.market?.zip;
+    if (zip) lastMarketZip = zip;
+  });
 
   function togglePanel(which: "favourites" | "market" | "alerts"): void {
     openPanel = openPanel === which ? null : which;
@@ -158,6 +173,11 @@
     [...(snapshot?.live ?? [])].sort(byWatchableThen(scoreOf)),
   );
 
+  // Hold the screen on only while there is something to watch.
+  $effect(() => {
+    setKeepAwake(live.length > 0);
+  });
+
   const top = $derived(live[0] ?? null);
   const topScore = $derived(top ? scoreOf(top) : 0);
   /* The label has to match what is actually on. Shouting "turn this on" at a
@@ -248,7 +268,7 @@
     {/if}
     <AlertsPicker
       league={prefs.league}
-      marketZip={snapshot?.market?.zip ?? null}
+      marketZip={lastMarketZip}
       open={openPanel === "alerts"}
       ontoggle={() => togglePanel("alerts")}
     />
@@ -351,22 +371,19 @@
      text to 13px and was silently winning against a bare .cutoff.
      No rule of its own: the rows above and below already carry full-width
      borders, and a second half-width line butting into them read as a mistake. */
-  /* A recessed block, so the label plainly heads everything inside it rather
-     than appearing to annotate the single row beneath. */
-  /* A full-bleed band rather than an inset card. An inset one had rounded corners
-     that collided with the full-width rules above and below it, and its own
-     border-top doubled the one the row above already draws. */
-  .panel .blocked {
-    margin: 0 -18px;
-    padding: 0 18px;
-    background: rgba(255, 255, 255, 0.025);
-  }
+  /* Styled as a section header, because that is what it is. Earlier attempts
+     dressed it as a caption and then as a banded block, and both read as
+     belonging to the row directly beneath rather than to everything below.
+     Matching the idiom this page already uses for "Worth planning around",
+     smaller since this one sits inside a card, settles what it refers to. The
+     space above does the work: it separates the label from the rows it is not
+     about. Scoped under .panel to outrank ".panel p", which sets card body text
+     to 13px and was silently winning against a bare .cutoff. */
   .panel .cutoff {
-    margin: 0;
-    padding: 9px 4px 1px;
+    margin: 22px 4px 8px;
     font-size: 10px;
-    font-weight: 600;
-    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
     color: var(--text-faint);
   }
   .controls-row {
