@@ -20,6 +20,26 @@ const distDir = process.env.DIST_DIR
   ? path.resolve(process.env.DIST_DIR)
   : path.resolve(here, "..", "dist");
 
+/**
+ * The bundle this process serves, read once at startup.
+ *
+ * Handed to the client on every poll so an open board notices a deploy without
+ * asking a separate question. Detecting it by re-fetching index.html on a timer
+ * worked but was slow, and hanging it off "a request failed, so the container
+ * must have restarted" was worse: a quick restart between two polls produces no
+ * error at all, so the check never ran and the deploy went unnoticed.
+ */
+function currentBuild(): string | null {
+  try {
+    const html = fs.readFileSync(path.join(distDir, "index.html"), "utf8");
+    return /<script[^>]+type="module"[^>]+src="([^"]+)"/.exec(html)?.[1] ?? null;
+  } catch {
+    return null; // No built frontend; the dev server handles its own reloading.
+  }
+}
+
+const BUILD = currentBuild();
+
 const standings = new StandingsStore();
 const listings = new ListingsStore();
 /**
@@ -382,6 +402,7 @@ function handleRequest(req: http.IncomingMessage, res: http.ServerResponse): voi
         return base;
       })
       .then((snapshot) => {
+        snapshot = { ...snapshot, build: BUILD };
         res.writeHead(200, {
           "content-type": "application/json; charset=utf-8",
           "cache-control": "no-store",

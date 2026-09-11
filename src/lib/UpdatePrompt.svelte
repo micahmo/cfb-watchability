@@ -1,15 +1,14 @@
 <script lang="ts">
-  import { onMount } from "svelte";
-  import { watchForUpdate } from "./appUpdate";
+  import { isStale } from "./appUpdate";
 
-  let ready = $state(false);
+  let { serverBuild = null }: { serverBuild?: string | null } = $props();
+
   let applying = $state(false);
+  let dismissed = $state<string | null>(null);
 
-  onMount(() => {
-    watchForUpdate(() => {
-      ready = true;
-    });
-  });
+  // Dismissing says "not now" about this build, not "never tell me again", so a
+  // later deploy is announced again on a board left open all afternoon.
+  const ready = $derived(isStale(serverBuild) && dismissed !== serverBuild);
 
   function reload(): void {
     applying = true;
@@ -26,7 +25,7 @@
     <button class="apply" onclick={reload} disabled={applying}>
       {applying ? "Refreshing..." : "Refresh"}
     </button>
-    <button class="dismiss" onclick={() => (ready = false)} aria-label="Dismiss">&times;</button>
+    <button class="dismiss" onclick={() => (dismissed = serverBuild)} aria-label="Dismiss">&times;</button>
   </div>
 {/if}
 

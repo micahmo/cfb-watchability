@@ -9,7 +9,6 @@
   import MarketPicker from "./lib/MarketPicker.svelte";
   import AlertsPicker from "./lib/AlertsPicker.svelte";
   import UpdatePrompt from "./lib/UpdatePrompt.svelte";
-  import { checkForUpdateNow } from "./lib/appUpdate";
 
   import GameCard from "./lib/GameCard.svelte";
   import UpcomingRow from "./lib/UpcomingRow.svelte";
@@ -59,9 +58,6 @@
       // Discard a response that arrived after the user switched tabs.
       if (next.league !== prefs.league) return;
       snapshot = next;
-      // Recovering from an error usually means the container just came back, which
-      // is the earliest evidence available that a new build might be serving.
-      if (loadError !== null) checkForUpdateNow();
       loadError = null;
     } catch (err) {
       loadError = err instanceof Error ? err.message : String(err);
@@ -357,7 +353,7 @@
   {/if}
 </div>
 
-<UpdatePrompt />
+<UpdatePrompt serverBuild={snapshot?.build ?? null} />
 
 <style>
   header {

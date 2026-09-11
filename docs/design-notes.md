@@ -439,6 +439,30 @@ is already watching something. They might simply have forgotten it was on. So th
 phrasing instead: "Switch to X" when there are alternatives, "X is worth putting on" when there
 are not.
 
+## Telling an open board that it is out of date
+
+The service worker cannot do it. `sw.js` is copied into the build untouched and names no hashed
+bundles, so it is byte identical between deploys and `updatefound` never fires.
+
+Three approaches, in the order they were tried:
+
+1. **Re-fetch `index.html` on a timer** and compare the script tag. Works, but is exactly as slow
+   as the interval, and five minutes is a long time to sit looking at a stale board.
+2. **Check when a poll fails and then recovers**, on the theory that a restart means a deploy.
+   This shipped and was wrong. It was lifted from an app with a persistent event stream, where a
+   dropped connection genuinely is unambiguous evidence of a restart. Polling has no equivalent: a
+   container that comes back between two twenty-second polls produces no error at all, so the
+   check never runs. The symptom was precise and it is worth remembering as a diagnostic: the user
+   never saw the "offline" indicator during the update, which is the same thing as saying the
+   trigger never fired.
+3. **The server reports the bundle it is serving** on every snapshot. The board already asks for
+   one every twenty seconds, so a deploy is noticed on the next poll, with no extra request, no
+   timer, and no dependence on anything having failed.
+
+The general lesson is about porting: the mechanism moved across cleanly but its *precondition* did
+not, and nothing complained. A trigger that relies on an outage is only reliable where an outage
+is guaranteed.
+
 ## Regenerating the screenshots
 
 The README shows four panels: live and upcoming, for each league. Only the upcoming pair can be

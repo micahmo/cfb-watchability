@@ -89,6 +89,7 @@ export class LeaguePoller {
       upcoming: [],
       recent: [],
       market: null,
+      build: null,
       error: null,
     };
   }
@@ -283,6 +284,7 @@ export class LeaguePoller {
         upcoming,
         recent,
         market: null,
+        build: null,
         error: null,
       };
       // After the snapshot is in place, so anything reading it sees the new one.

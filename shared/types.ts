@@ -136,6 +136,11 @@ export interface Snapshot {
   recent: Game[];
   error: string | null;
   /**
+   * The frontend bundle this server is serving, so an open board notices a deploy
+   * on its next poll rather than asking a separate question on a timer.
+   */
+  build: string | null;
+  /**
    * The viewer's resolved market. `detected` means it came from the network
    * rather than from them typing it, which is worth saying out loud so a wrong
    * guess is obviously theirs to correct.
