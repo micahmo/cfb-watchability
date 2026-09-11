@@ -18,15 +18,15 @@
 </script>
 
 {#if conferences.length}
-  <button type="button" class="toggle" onclick={() => ontoggle?.()}>
+  <button type="button" class="dd-toggle" onclick={() => ontoggle?.()}>
     {chosen.length ? `Favourites: ${chosen.join(", ")}` : "Favourites"}
-    <span class="caret" class:open>▾</span>
+    <span class="dd-caret" class:open>▾</span>
   </button>
 {/if}
 
 {#if open}
-  <div class="panel">
-    <p class="hint">Games involving these get a boost up the board.</p>
+  <div class="dd-panel">
+    <p class="dd-hint">Games involving these get a boost up the board.</p>
     <div class="grid">
       {#each conferences as conference (conference)}
         <label class="item" class:on={isFavourite(league, conference)}>
@@ -43,51 +43,6 @@
 {/if}
 
 <style>
-  .toggle {
-    background: none;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    color: var(--text-dim);
-    font: inherit;
-    font-size: 12px;
-    font-weight: 600;
-    /* Matches the height of the segmented control beside it. */
-    height: 32px;
-    padding: 0 11px;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    gap: 7px;
-    max-width: 100%;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-  }
-  @media (hover: hover) {
-    .toggle:hover {
-      color: var(--text);
-      border-color: var(--border-hi);
-    }
-  }
-  .caret {
-    font-size: 10px;
-    transition: transform 0.15s ease;
-  }
-  .caret.open {
-    transform: rotate(180deg);
-  }
-  .panel {
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 10px 12px;
-    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.5);
-  }
-  .hint {
-    margin: 0 0 8px;
-    font-size: 11px;
-    color: var(--text-faint);
-  }
   .grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));

@@ -82,3 +82,57 @@ a {
   padding: 1px 6px;
   white-space: nowrap;
 }
+
+/* Dropdown chrome. Shared by the favourites and market controls, which sit side
+   by side and must look identical: two private copies drifted apart, one growing
+   a "set" state and a different line-height the other never got.
+   Deliberately not called ".panel": App.svelte already uses that for the day
+   cards, and the collision let ".panel p" win the cascade over a label's own
+   font-size. */
+.dd-toggle {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  height: 32px;
+  padding: 0 11px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.dd-toggle.set {
+  color: var(--text);
+}
+@media (hover: hover) {
+  .dd-toggle:hover {
+    color: var(--text);
+    border-color: var(--border-hi);
+  }
+}
+.dd-caret {
+  font-size: 10px;
+  transition: transform 0.15s ease;
+}
+.dd-caret.open {
+  transform: rotate(180deg);
+}
+.dd-panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+.dd-hint {
+  margin: 0 0 8px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-faint);
+}

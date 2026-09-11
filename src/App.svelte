@@ -120,23 +120,6 @@
   }
 
   /**
-   * The stations that decide anything: the ones carrying a market-split game.
-   * Every NFL affiliate in the market also carries the national games, so the
-   * server's full list runs to eight call signs and says nothing useful.
-   */
-  const marketStations = $derived.by(() => {
-    const names = new Set<string>();
-    for (const game of [
-      ...(snapshot?.live ?? []),
-      ...(snapshot?.upcoming ?? []),
-      ...(snapshot?.recent ?? []),
-    ]) {
-      for (const station of game.marketStations ?? []) names.add(station);
-    }
-    return [...names].sort();
-  });
-
-  /**
    * Whether the slate actually contains market-split games, so the nudge only
    * appears when it would change something. A Thursday night slate is one
    * national game with nothing to resolve.
@@ -245,7 +228,7 @@
     />
     {#if prefs.league === "nfl"}
       <MarketPicker
-        stations={marketStations}
+        stations={snapshot?.market?.stations ?? []}
         detected={snapshot?.market?.detected === true ? snapshot.market.zip : null}
         city={snapshot?.market?.city ?? null}
         nudge={marketMatters}
@@ -346,18 +329,20 @@
     justify-content: space-between;
     gap: 12px;
   }
-  .cutoff {
+  /* Scoped under .panel to outrank ".panel p", which sets the day cards' body
+     text to 13px and was silently winning against a bare .cutoff. */
+  .panel .cutoff {
     display: flex;
     align-items: center;
-    gap: 10px;
-    margin: 4px 14px 2px;
+    gap: 8px;
+    margin: 10px 14px 4px;
     font-size: 10px;
     font-weight: 600;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
+    letter-spacing: 0.04em;
     color: var(--text-faint);
+    opacity: 0.75;
   }
-  .cutoff::after {
+  .panel .cutoff::after {
     content: "";
     flex: 1;
     height: 1px;
@@ -368,18 +353,14 @@
     flex-wrap: wrap;
     align-items: center;
     gap: 8px;
-    margin-top: 10px;
-    /* Anchors the panels, which drop over the board rather than shoving it down. */
-    position: relative;
+    margin-top: 14px;
   }
-  /* Panels are rendered by the controls but positioned by the row, so a panel
-     never becomes a flex item competing with the buttons for space. */
-  .controls-row :global(.panel) {
-    position: absolute;
-    top: calc(100% + 6px);
-    left: 0;
-    right: 0;
-    z-index: 15;
+  /* An open panel takes a whole row of its own and is ordered after both buttons,
+     so it pushes the board down rather than covering it, and never wedges itself
+     between the two controls the way a plain flex sibling did. */
+  .controls-row :global(.dd-panel) {
+    order: 1;
+    flex-basis: 100%;
   }
   .status {
     display: flex;
