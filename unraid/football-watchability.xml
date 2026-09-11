@@ -17,7 +17,8 @@
     magnitude against the pregame closing line, and scoring pace. Also ranks the
     week ahead by how much each matchup is worth planning around.
 
-    Stateless: no volumes or database. Needs no API keys.
+    Needs no API keys. The board keeps nothing on disk; only the optional push
+    notifications need a volume.
   </Overview>
   <Category>Other: Tools:</Category>
   <WebUI>http://[IP]:[PORT:8787]/</WebUI>
