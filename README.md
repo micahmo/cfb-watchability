@@ -181,6 +181,20 @@ reliably lands in the right metro but not always the right one of two neighbouri
 Trusting that header is safe because it is per request: forging one only changes the listings in
 your own response, which you could do by typing a different postal code anyway.
 
+**A postal code alone is not always one market.** The listings grid's default is the
+over-the-air list, which near a boundary sweeps in every transmitter the area could receive:
+Fitchburg MA returns Boston, Providence, Manchester and Springfield affiliates together, and
+those are separate markets that can be airing different games. The board notices, because any one
+market shows exactly one CBS and one FOX game per Sunday window, so three or more matchups in a
+window means the list straddles two. When that happens it silently re-reads through a real
+provider's lineup for the market and says nothing about it. Rensselaer IN returns three 1:00
+games over the air and resolves to DISH Chicago, which drops the Indianapolis game correctly.
+
+Nobody is asked to name their provider, which matters because the listings source has no
+streaming lineups at all: no YouTube TV, Hulu Live or Fubo, only over-the-air, cable and
+satellite. That turns out not to matter, since every provider in a market carries the same local
+affiliates, and it is the affiliate that decides which regional game you get.
+
 The market control has three states, because "work it out for me" and "do not filter at all" are
 different requests: a postal code you typed, the detected one, and explicitly off. **Clear** turns
 it off entirely rather than falling back to detection, and **Redetect** goes back to the network's

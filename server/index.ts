@@ -52,6 +52,12 @@ function zipFrom(url: string): string | null {
  * client that forges one only changes the listings in its own response, which it
  * could do by typing a different postal code anyway.
  */
+function detectedCity(req: http.IncomingMessage): string | null {
+  const raw = req.headers["cf-ipcity"];
+  const city = typeof raw === "string" ? decodeURIComponent(raw).trim() : "";
+  return city.length > 0 && city.length < 64 ? city : null;
+}
+
 function detectedZip(req: http.IncomingMessage): string | null {
   const headers = req.headers;
   return (
@@ -72,9 +78,10 @@ async function withMarket(
   snapshot: Snapshot,
   zip: string,
   detected: boolean,
+  city: string | null,
 ): Promise<Snapshot> {
   const games = [...snapshot.live, ...snapshot.upcoming, ...snapshot.recent];
-  const market = await listings.get(zip, games);
+  const market = await listings.resolve(zip, games);
   if (market === null) return snapshot;
 
   const annotate = (game: Game): Game => ({
@@ -91,7 +98,7 @@ async function withMarket(
     live: snapshot.live.map(annotate),
     upcoming: snapshot.upcoming.map(annotate),
     recent: snapshot.recent.map(annotate),
-    market: { zip, stations: market.stations, detected },
+    market: { zip, stations: market.stations, detected, city },
   };
 }
 
@@ -171,14 +178,20 @@ function handleRequest(req: http.IncomingMessage, res: http.ServerResponse): voi
   if (url === "/api/snapshot") {
     const league = leagueFrom(raw);
     const chosen = zipFrom(raw);
-    const optedOut = new URL(raw, "http://localhost").searchParams.get("market") === "off";
+    const params = new URL(raw, "http://localhost").searchParams;
+    const optedOut = params.get("market") === "off";
     const detected = optedOut ? null : detectedZip(req);
     const zip = optedOut ? null : (chosen ?? detected);
     const base = pollers[league].snapshot;
     // Only the NFL splits a slate by market; college games are on cable.
     const ready =
       zip !== null && league === "nfl"
-        ? withMarket(base, zip, chosen === null)
+        ? withMarket(
+            base,
+            zip,
+            chosen === null,
+            chosen === null ? detectedCity(req) : null,
+          )
         : Promise.resolve(base);
     void ready
       .catch((err) => {
@@ -192,6 +205,29 @@ function handleRequest(req: http.IncomingMessage, res: http.ServerResponse): voi
           "access-control-allow-origin": "*",
         });
         res.end(JSON.stringify(snapshot));
+      });
+    return;
+  }
+
+  if (url === "/api/providers") {
+    const zip = zipFrom(raw);
+    if (zip === null) {
+      res.writeHead(400, { "content-type": "application/json; charset=utf-8" });
+      res.end(JSON.stringify({ error: "zip required" }));
+      return;
+    }
+    void listings
+      .providers(zip)
+      .catch((err) => {
+        console.error(`[listings] providers ${zip}: ${err instanceof Error ? err.message : err}`);
+        return [];
+      })
+      .then((providers) => {
+        res.writeHead(200, {
+          "content-type": "application/json; charset=utf-8",
+          "cache-control": "no-store",
+        });
+        res.end(JSON.stringify({ providers }));
       });
     return;
   }

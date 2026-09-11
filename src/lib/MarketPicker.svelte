@@ -4,53 +4,61 @@
   let {
     stations,
     detected = null,
+    city = null,
     nudge = false,
+    open = false,
+    ontoggle,
+    onclose,
   }: {
     stations: string[];
     /** Postal code Cloudflare reported, when the network knew it. */
     detected?: string | null;
+    /** City for that postal code, so the chip names a place not a transmitter. */
+    city?: string | null;
     /** The slate splits by market and nothing has resolved one. */
     nudge?: boolean;
+    open?: boolean;
+    ontoggle?: () => void;
+    onclose?: () => void;
   } = $props();
 
   /** What the board is actually using, whoever supplied it. */
   const active = $derived(prefs.marketOff ? null : (prefs.zip ?? detected));
 
-  let open = $state(false);
   let draft = $state(prefs.zip ?? "");
 
   const valid = $derived(/^\d{5}$/.test(draft));
-  /* Two or three call signs is enough to recognise your own market at a glance;
-     the full list is eight channels of noise. */
+  /* A place, not a list of transmitters. The call signs mean nothing to someone
+     who just wants to know the board is pointed at the right city. */
   const label = $derived(
     active === null
       ? prefs.marketOff
         ? "Market off"
         : "Set market"
-      : stations.length
-        ? `${active} · ${stations.slice(0, 3).join(", ")}`
+      : city !== null
+          ? `${city} ${active}`
         : active,
   );
 
   function save(): void {
     setZip(draft);
-    open = false;
+    onclose?.();
   }
 
   function clear(): void {
     draft = "";
     clearMarket();
-    open = false;
+    onclose?.();
   }
 
   function redetect(): void {
     draft = "";
     redetectMarket();
-    open = false;
+    onclose?.();
   }
 </script>
 
-<button type="button" class="toggle" class:set={active !== null} onclick={() => (open = !open)}>
+<button type="button" class="toggle" class:set={active !== null} onclick={() => ontoggle?.()}>
   <!-- The whole explanation lives inside the panel. Out here a dot is enough to say
        there is something to set, and unlike a banner it costs no vertical space. -->
   {#if nudge && !open}<span class="dot" aria-hidden="true"></span>{/if}
@@ -77,7 +85,7 @@
         type="text"
         inputmode="numeric"
         maxlength="5"
-        placeholder="02134"
+        placeholder={active ?? "02134"}
         bind:value={draft}
         onkeydown={(e) => e.key === "Enter" && valid && save()}
       />
@@ -90,8 +98,8 @@
         <button type="button" class="clear" onclick={redetect}>Redetect</button>
       {/if}
     </div>
-    {#if active !== null && stations.length}
-      <p class="stations">Reading listings for {stations.join(", ")}.</p>
+    {#if active !== null}
+      <p class="stations">Reading {stations.join(", ")}.</p>
     {/if}
   </div>
 {/if}
@@ -145,7 +153,7 @@
     border: 1px solid var(--border);
     border-radius: 10px;
     padding: 10px 12px;
-    margin-top: 8px;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.5);
   }
   .hint {
     margin: 0 0 8px;

@@ -105,13 +105,10 @@
       {#if !game.nationalBroadcast}<span class="note warn">local feed</span>{/if}
       <!-- Only shown once a postal code makes the answer real. Before that every
            1:00 game is equally "regional", which is noise rather than a signal. -->
-      {#if game.marketStations !== null}
-        {#if game.marketStations.length}
-          <span class="note">on {game.marketStations.slice(0, 2).join(", ")}</span>
-        {:else}
-          <span class="note">not on your channels</span>
-        {/if}
-      {/if}
+      <!-- Only the exclusion. The channel chip already says CBS or FOX, and the
+           grid's call signs span neighbouring markets whose affiliates this viewer
+           cannot receive, so naming them was noise at best and wrong at worst. -->
+      {#if unavailable}<span class="note">not on your channels</span>{/if}
       {#if game.conferenceGame}<span class="note">conference game</span>{/if}
       {#each game.tags as tag (tag)}
         <span class="tag" class:hot={HOT_TAGS.has(tag)}>{tag}</span>

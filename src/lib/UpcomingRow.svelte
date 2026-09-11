@@ -36,13 +36,6 @@
       {#if game.odds}<span>{game.odds}</span>{/if}
       {#if game.overUnder}<span>o/u {game.overUnder}</span>{/if}
       {#if !game.nationalBroadcast}<span class="local">local feed</span>{/if}
-      {#if game.marketStations !== null}
-        {#if game.marketStations.length}
-          <span>on {game.marketStations.slice(0, 2).join(", ")}</span>
-        {:else}
-          <span>not on your channels</span>
-        {/if}
-      {/if}
     </span>
   </div>
 </div>

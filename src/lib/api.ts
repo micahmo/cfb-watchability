@@ -15,3 +15,4 @@ export async function fetchSnapshot(
   if (!res.ok) throw new Error(`Snapshot request failed: ${res.status}`);
   return (await res.json()) as Snapshot;
 }
+

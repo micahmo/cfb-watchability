@@ -20,6 +20,17 @@
   /** Day keys the user has expanded past MAX_PER_DAY. */
   let expanded = $state<Record<string, boolean>>({});
 
+  /**
+   * Which control has its panel down. Owned here rather than by each control,
+   * because they share a row: two panels open at once would overlap, and a panel
+   * that is a flex sibling of its own button wedges the row apart when it opens.
+   */
+  let openPanel = $state<"favourites" | "market" | null>(null);
+
+  function togglePanel(which: "favourites" | "market"): void {
+    openPanel = openPanel === which ? null : which;
+  }
+
   let snapshot = $state<Snapshot | null>(null);
   let loadError = $state<string | null>(null);
   let loading = $state(true);
@@ -186,14 +197,18 @@
       .map(([key, games]) => {
         const ranked = [...games].sort(byWatchableThen(anticipationOf));
         const showAll = expanded[key] === true;
+        const shown = showAll ? ranked : ranked.slice(0, MAX_PER_DAY);
+        const firstUnavailable = shown.findIndex((g) => !watchable(g));
         return {
           key,
+          /** Where the tail the viewer cannot watch begins, or -1 if there is none. */
+          splitAt: firstUnavailable,
           label: dayLabel(games[0].startDate),
           date: dayDate(games[0].startDate),
           total: ranked.length,
           hidden: Math.max(0, ranked.length - MAX_PER_DAY),
           showAll,
-          games: showAll ? ranked : ranked.slice(0, MAX_PER_DAY),
+          games: shown,
         };
       });
   });
@@ -222,12 +237,21 @@
     </div>
   </div>
   <div class="controls-row">
-    <FavouriteConferences {conferences} league={prefs.league} />
+    <FavouriteConferences
+      {conferences}
+      league={prefs.league}
+      open={openPanel === "favourites"}
+      ontoggle={() => togglePanel("favourites")}
+    />
     {#if prefs.league === "nfl"}
       <MarketPicker
         stations={marketStations}
         detected={snapshot?.market?.detected === true ? snapshot.market.zip : null}
+        city={snapshot?.market?.city ?? null}
         nudge={marketMatters}
+        open={openPanel === "market"}
+        ontoggle={() => togglePanel("market")}
+        onclose={() => (openPanel = null)}
       />
     {/if}
   </div>
@@ -275,7 +299,12 @@
             <span class="day-date">{day.date}</span>
           </h3>
           <div class="panel tight">
-            {#each day.games as game (game.id)}
+            {#each day.games as game, i (game.id)}
+              <!-- The unavailable games are already sorted to the bottom, so one
+                   divider labels the whole tail instead of every row repeating it. -->
+              {#if i === day.splitAt}
+                <p class="cutoff"><span>not on your channels</span></p>
+              {/if}
               <UpcomingRow {game} score={anticipationOf(game)} />
             {/each}
             {#if day.hidden > 0 || day.showAll}
@@ -317,12 +346,40 @@
     justify-content: space-between;
     gap: 12px;
   }
+  .cutoff {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 4px 14px 2px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+  }
+  .cutoff::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
   .controls-row {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: 8px;
     margin-top: 10px;
+    /* Anchors the panels, which drop over the board rather than shoving it down. */
+    position: relative;
+  }
+  /* Panels are rendered by the controls but positioned by the row, so a panel
+     never becomes a flex item competing with the buttons for space. */
+  .controls-row :global(.panel) {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    right: 0;
+    z-index: 15;
   }
   .status {
     display: flex;

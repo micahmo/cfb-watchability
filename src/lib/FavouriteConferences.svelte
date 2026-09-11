@@ -2,14 +2,23 @@
   import type { League } from "../../shared/types";
   import { isFavourite, prefs, toggleFavourite } from "./prefs.svelte";
 
-  let { conferences, league }: { conferences: string[]; league: League } = $props();
-
-  let open = $state(false);
+  let {
+    conferences,
+    league,
+    open = false,
+    ontoggle,
+  }: {
+    conferences: string[];
+    league: League;
+    /** Owned by the parent so only one panel in the row can be open at a time. */
+    open?: boolean;
+    ontoggle?: () => void;
+  } = $props();
   const chosen = $derived(prefs.favourites[league] ?? []);
 </script>
 
 {#if conferences.length}
-  <button type="button" class="toggle" onclick={() => (open = !open)}>
+  <button type="button" class="toggle" onclick={() => ontoggle?.()}>
     {chosen.length ? `Favourites: ${chosen.join(", ")}` : "Favourites"}
     <span class="caret" class:open>▾</span>
   </button>
@@ -72,7 +81,7 @@
     border: 1px solid var(--border);
     border-radius: 10px;
     padding: 10px 12px;
-    margin-top: 8px;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.5);
   }
   .hint {
     margin: 0 0 8px;

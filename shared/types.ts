@@ -115,6 +115,15 @@ export interface Game {
   tags: string[];
 }
 
+/** A television lineup the viewer might be on, from the listings provider. */
+export interface Provider {
+  lineupId: string;
+  name: string;
+  location: string;
+  type: string;
+  device: string;
+}
+
 export interface Snapshot {
   league: League;
   updatedAt: string;
@@ -129,5 +138,10 @@ export interface Snapshot {
    * rather than from them typing it, which is worth saying out loud so a wrong
    * guess is obviously theirs to correct.
    */
-  market: { zip: string; stations: string[]; detected: boolean } | null;
+  market: {
+    zip: string;
+    stations: string[];
+    detected: boolean;
+    city: string | null;
+  } | null;
 }
