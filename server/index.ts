@@ -22,8 +22,24 @@ const distDir = process.env.DIST_DIR
 
 const standings = new StandingsStore();
 const listings = new ListingsStore();
-/** Notifications are the one feature that needs somewhere durable to live. */
-const subscriptions = new SubscriptionStore(process.env.NOTIFY_DIR);
+/**
+ * Notifications are the one feature that needs somewhere durable to live, and the
+ * only one that can fail at startup. Everything else on this board is a cache of
+ * ESPN, so a notification problem must degrade to "alerts unavailable" rather
+ * than taking the scoreboard down with it. It has done exactly that twice.
+ */
+function startSubscriptions(): SubscriptionStore {
+  try {
+    return new SubscriptionStore(process.env.NOTIFY_DIR);
+  } catch (err) {
+    console.error(
+      `[notify] disabled after a startup failure: ${err instanceof Error ? err.message : err}`,
+    );
+    return new SubscriptionStore(undefined);
+  }
+}
+
+const subscriptions = startSubscriptions();
 const alerts = new AlertEngine(subscriptions);
 
 /** Each league polls independently, so a quiet NFL week cannot slow a busy Saturday. */

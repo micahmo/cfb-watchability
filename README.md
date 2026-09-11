@@ -147,7 +147,10 @@ minutes.
 rebuilt from anywhere. Mount a volume and point `NOTIFY_DIR` at it:
 
 ```bash
-  -v /path/on/host:/config   -e NOTIFY_DIR=/config ```
+  -v /path/on/host:/config   -e NOTIFY_DIR=/config   -e PUID=99 -e PGID=100 ```
+
+`PUID` and `PGID` decide who the server runs as; the container takes ownership of the
+notification directory on start, then drops to that user. On Unraid they are `99` and `100`.
 
 Without it the feature is simply unavailable and everything else is unchanged. The server checks
 that the directory is really a mounted volume rather than trusting the variable, so a forgotten
@@ -185,6 +188,7 @@ only offers to install from a secure context, which rules out plain-http LAN add
 | `ALLOWED_HOSTS` | - | Extra hostnames the dev server answers to, comma separated |
 | `NOTIFY_DIR` | - | Where to keep push keys and subscriptions. Must be a mounted volume |
 | `NOTIFY_CONTACT` | - | `mailto:` address sent to push services with each delivery |
+| `PUID` / `PGID` | `1000` | User and group the server runs as. Set to match the volume's owner |
 
 Replaying a past slate is the easiest way to see a full board on a quiet weeknight:
 

@@ -188,11 +188,13 @@
         const ranked = [...games].sort(byWatchableThen(anticipationOf));
         const showAll = expanded[key] === true;
         const shown = showAll ? ranked : ranked.slice(0, MAX_PER_DAY);
-        const firstUnavailable = shown.findIndex((g) => !watchable(g));
         return {
           key,
-          /** Where the tail the viewer cannot watch begins, or -1 if there is none. */
-          splitAt: firstUnavailable,
+          /* Split rather than marked with a divider. A label above a row reads as
+             belonging to that row, so with one game below it there was no way to
+             tell whether it covered one or all of them. */
+          available: shown.filter((g) => watchable(g)),
+          unavailable: shown.filter((g) => !watchable(g)),
           label: dayLabel(games[0].startDate),
           date: dayDate(games[0].startDate),
           total: ranked.length,
@@ -294,14 +296,17 @@
             <span class="day-date">{day.date}</span>
           </h3>
           <div class="panel tight">
-            {#each day.games as game, i (game.id)}
-              <!-- The unavailable games are already sorted to the bottom, so one
-                   divider labels the whole tail instead of every row repeating it. -->
-              {#if i === day.splitAt}
-                <p class="cutoff">not on your channels</p>
-              {/if}
+            {#each day.available as game (game.id)}
               <UpcomingRow {game} score={anticipationOf(game)} />
             {/each}
+            {#if day.unavailable.length > 0}
+              <div class="blocked">
+                <p class="cutoff">not on your channels</p>
+                {#each day.unavailable as game (game.id)}
+                  <UpcomingRow {game} score={anticipationOf(game)} />
+                {/each}
+              </div>
+            {/if}
             {#if day.hidden > 0 || day.showAll}
               <button
                 type="button"
@@ -345,9 +350,18 @@
      text to 13px and was silently winning against a bare .cutoff.
      No rule of its own: the rows above and below already carry full-width
      borders, and a second half-width line butting into them read as a mistake. */
+  /* A recessed block, so the label plainly heads everything inside it rather
+     than appearing to annotate the single row beneath. */
+  .panel .blocked {
+    margin-top: 8px;
+    padding: 0 10px;
+    border-top: 1px solid var(--border);
+    background: rgba(0, 0, 0, 0.18);
+    border-radius: 0 0 10px 10px;
+  }
   .panel .cutoff {
     margin: 0;
-    padding: 10px 4px 2px;
+    padding: 9px 4px 1px;
     font-size: 10px;
     font-weight: 600;
     letter-spacing: 0.04em;

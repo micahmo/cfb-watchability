@@ -51,8 +51,11 @@ export class SubscriptionStore {
       return;
     }
     this.data = this.load();
+    // `??` is wrong here: an unset template variable arrives as an empty string,
+    // not undefined, and web-push rejects a blank subject by throwing.
+    const contact = (process.env.NOTIFY_CONTACT ?? "").trim();
     webpush.setVapidDetails(
-      process.env.NOTIFY_CONTACT ?? "mailto:nobody@example.com",
+      contact.length > 0 ? contact : "mailto:nobody@example.com",
       this.data.vapid.publicKey,
       this.data.vapid.privateKey,
     );

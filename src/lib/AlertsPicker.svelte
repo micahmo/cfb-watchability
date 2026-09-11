@@ -41,12 +41,18 @@
   let error = $state<string | null>(null);
 
   const supported = pushSupported();
+  /* Hidden rather than shown-and-disabled. A control that cannot do anything is
+     an invitation to try, and explaining why would mean telling a viewer about
+     the server's filesystem, which is none of their business. */
+  const usable = $derived(supported && config?.available === true);
   const chosen = $derived(prefs.alerts[league] ?? []);
   const anyOn = $derived((prefs.alerts.nfl ?? []).length + (prefs.alerts.cfb ?? []).length > 0);
   const label = $derived(chosen.length > 0 ? `Alerts (${chosen.length})` : "Alerts");
 
+  // Asked once on load rather than on open, so the control knows whether to
+  // render itself at all before the viewer reaches for it.
   $effect(() => {
-    if (open && config === null) void fetchPushConfig().then((c) => (config = c));
+    if (config === null) void fetchPushConfig().then((c) => (config = c));
   });
 
   async function toggle(category: Category): Promise<void> {
@@ -74,15 +80,13 @@
           favourites: prefs.favourites,
         });
         if (!ok) {
-          // Permission refused, no service worker, or the push service said no.
-          // Put the switch back rather than showing it on when nothing will come.
+          // Permission refused, or the push service said no. Put the switch back
+          // rather than showing it on when nothing will arrive.
           setAlerts(league, previous);
           error =
             Notification.permission === "denied"
               ? "Notifications are blocked for this site in your browser settings."
-              : (await navigator.serviceWorker.getRegistration()) === undefined
-                ? "No service worker. Open the board over HTTPS, or install it first."
-                : "Could not subscribe.";
+              : "Could not turn alerts on. Try again in a moment.";
         }
       }
     } catch {
@@ -94,26 +98,16 @@
   }
 </script>
 
-<button type="button" class="dd-toggle" onclick={() => ontoggle?.()}>
-  {label}
-  <span class="dd-caret" class:open>▾</span>
-</button>
+{#if usable}
+  <button type="button" class="dd-toggle" onclick={() => ontoggle?.()}>
+    {label}
+    <span class="dd-caret" class:open>▾</span>
+  </button>
+{/if}
 
-{#if open}
+{#if usable && open}
   <div class="dd-panel">
-    {#if !supported}
-      <p class="dd-hint">
-        This browser cannot do push notifications. On iOS the board has to be added to the home
-        screen first.
-      </p>
-    {:else if config === null}
-      <p class="dd-hint">Checking…</p>
-    {:else if !config.available}
-      <p class="dd-hint">
-        The server has nowhere durable to keep subscriptions, so alerts are turned off. Mount a
-        volume and set <code>NOTIFY_DIR</code> to enable them.
-      </p>
-    {:else}
+    {#if config}
       <p class="dd-hint">
         Alerts for {league === "nfl" ? "the NFL" : "college"}. Games your market is not carrying are
         never sent.
@@ -179,8 +173,5 @@
     margin: 9px 0 0;
     font-size: 11px;
     color: var(--text-faint);
-  }
-  code {
-    font-size: 10px;
   }
 </style>
