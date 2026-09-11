@@ -486,9 +486,34 @@ empty 404. That distinction is what located the correct path.
 Valid topic found: `scoreboard-football-nfl`. Per-event names of the shape `gp-football-nfl-<id>`
 and `event-<id>` are all rejected, so the scoreboard topic appears to be the unit.
 
-**Unverified:** what the pushes actually contain. Nothing was live when this was probed, so the
-pipe is proven and the payload is not. `pl` is expected to be base64'd gzip. Capture a few during
-a live window before building anything on it.
+**The payload is RFC 6902 JSON Patch**, captured live against women's college volleyball:
+
+```
+{"op":"P","mid":1978179,"tc":"scoreboard-...","pl":"{\"ts\":...,\"~c\":1,\"pl\":\"eJyLrlbK...\"}"}
+```
+
+`pl` is a JSON string whose own `pl` field is base64 zlib. Inflated:
+
+```json
+[{"op":"replace",
+  "path":"s:400~l:402~e:401897757/competitions/0/competitors/1/linescores/0/value",
+  "value":23}]
+```
+
+Two layers of `pl` is the trap: base64-decoding the outer one yields noise, which looks like an
+unknown compression format and sent the first attempt down the wrong path entirely.
+
+Deltas, roughly 230 bytes each, keyed by ESPN's `s:<sport>~l:<league>~e:<event>` uid, with paths
+that land directly on the scoreboard document the REST client already parses. Measured 13 pushes
+in 35 seconds across a dozen live matches.
+
+That makes the shape obvious, and it is what ESPN's own site does: fetch the scoreboard once for
+initial state, subscribe, apply patches, re-score. It would take the live board from roughly fifty
+seconds stale to a couple of seconds.
+
+Not yet built. What it needs beyond the client itself: honouring the 30-second heartbeat,
+re-fetching over REST on reconnect to resync, and keeping REST polling anyway for odds, standings
+and the schedule, none of which come down this feed.
 
 This also settles the SSE question, which was previously "no". That answer assumed the server
 stays 30 seconds behind ESPN, which makes pushing to the client pointless. The two go together:
