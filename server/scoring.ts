@@ -291,6 +291,45 @@ function combinedUpset(input: ScoreInputs, progress: number): number {
   return Math.max(market, RANK_ONLY_CEILING * narrative);
 }
 
+/**
+ * How compelling an upset-in-progress is, independent of how close the game is.
+ *
+ * The board otherwise conflates "watchable" with "close", and a blowout upset is
+ * invisible to it. UMass, 29.5-point underdogs, led Rutgers 24-7 at the half and
+ * won by 16: the biggest story of that weekend, and the model peaked it at 45.9
+ * and would not have mentioned it, because it stopped being competitive early.
+ *
+ * The tension in an upset is not about the margin, it is about whether the
+ * improbable thing is going to happen. So it rises as the underdog's win
+ * probability climbs away from where the line put it, and falls again once the
+ * result is no longer in doubt, which is exactly the arc a viewer feels. On that
+ * game it peaks at the half, at 24-7 with the underdog at 67%, and decays to zero
+ * by the fourth quarter even as the winning margin grows.
+ */
+export function upsetTensionScore(
+  homeSpread: number | null,
+  homeWinProb: number | null,
+  isFinal: boolean,
+): number {
+  if (isFinal || homeSpread === null || homeWinProb === null) return 0;
+  const spread = Math.abs(homeSpread);
+  // Below a touchdown there is no upset to speak of, just a close game, which the
+  // main term already handles.
+  if (spread < 6) return 0;
+
+  // Implied pregame win probability for the favourite. A logistic on the spread:
+  // a field goal is a coin flip nudged, four touchdowns is a formality.
+  const favPre = 1 / (1 + Math.exp(-spread / 6.5));
+  const homeFavoured = homeSpread < 0;
+  const dogLive = homeFavoured ? 1 - homeWinProb : homeWinProb;
+  const dogPre = 1 - favPre;
+
+  // How far the improbable has come, and how much doubt is left in it.
+  const surprise = clamp((dogLive - dogPre) / (1 - dogPre));
+  const doubt = 4 * dogLive * (1 - dogLive);
+  return clamp(surprise * doubt);
+}
+
 export function scoreGame(input: ScoreInputs): ScoreBreakdown {
   const progress = gameProgress(input.period, input.clockSeconds);
   const margin = Math.abs(input.home.score - input.away.score);
@@ -327,12 +366,18 @@ export function scoreGame(input: ScoreInputs): ScoreBreakdown {
         leaderTeamId,
       });
 
+  const upsetTension = upsetTensionScore(input.homeSpread, input.homeWinProb, input.isFinal === true);
+
   const components: ScoreComponents = {
     tension,
     lateness,
     core,
     clutch,
-    primary: Math.max(core, clutch),
+    upsetTension,
+    // Three ways to earn the dominant term, and a game qualifies on any of them:
+    // it is close and late, it has a decisive snap coming, or something is
+    // happening that was not supposed to.
+    primary: Math.max(core, clutch, upsetTension),
     prominence: prominenceScore({
       league: input.league,
       homeConferenceId: input.home.conferenceId,

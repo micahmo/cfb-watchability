@@ -263,6 +263,147 @@ decides which regional game you get.
 WFLD, FOX Chicago, into "WF", and WWLP into "WW". A trim only stands if what it leaves behind is
 itself a valid call sign: K or W plus two or three letters.
 
+## Notifications
+
+### Knowing whether there is anywhere to put them
+
+Everything else here is a cache of ESPN that rebuilds within a poll or two, which is why the
+container is disposable and a Force Update is risk-free. Push notifications break that: a VAPID
+keypair that changes silently invalidates every subscription anyone ever made, and the
+subscriptions cannot be rebuilt from anywhere.
+
+So the feature is offered only when there is somewhere real to keep them, and the server works
+that out rather than trusting configuration. A container cannot be told it has a volume, but it
+can look at `/proc/self/mountinfo`: a mounted volume is a separate mount from the container's own
+layer.
+
+The signal is the **mount point**, not the filesystem type. Checking the filesystem looks right
+and is wrong: it assumes the container's layer is `overlay`, and this deployment's host uses the
+btrfs storage driver, so `/tmp` inside the container reports `btrfs` and sails through as real
+storage. Found by running the check inside the actual container instead of trusting it. A path
+still covered by the root mount is on the container's own layer; a path with its own deeper mount
+was handed in from outside. Memory filesystems are excluded separately, because Kubernetes mounts
+the service account token as tmpfs on its own mount and it would otherwise pass.
+
+Verified against the live deployment:
+
+```
+/app       not-writable                    (the image runs as non-root)
+/tmp       container-layer   btrfs         <- the case that fstype alone gets wrong
+/dev/shm   memory            tmpfs
+/data      missing
+```
+
+The one case nothing inside a container can detect is a disk-backed Kubernetes `emptyDir`, which
+is indistinguishable from a PVC from the inside and dies with the pod. That stays a documentation
+problem.
+
+### When a notification fires
+
+The principle is that a notification's job is to tell you that you are watching the wrong game.
+It follows that a notification you cannot act on is worse than none, since it only tells you what
+you missed, and that everything fires on a **transition** rather than a state: a game sitting at
+82 for twenty minutes is one event, not forty polls.
+
+| | Fires | Gate |
+| --- | --- | --- |
+| Turn this on | Boosted live score crosses 75 | At least 60s of game clock left |
+| Instant classic | The same game later crosses 85 | None |
+| Upset alert | Underdog level or ahead within one score, spread 7+ | Fourth quarter only |
+| Kickoff | Best game in a window of four or more games | At kickoff |
+
+Plus: seed state on the first poll after startup so a restart mid-slate announces nothing; one
+notification per game per tier, ever; a global cooldown with simultaneous crossings coalesced into
+a single message; a daily cap of three per league; and never notify about a game the market
+lookup says is unavailable.
+
+### How the thresholds were chosen
+
+By replaying real games rather than by argument. ESPN's summary endpoint returns a
+`winprobability` array joined to the play list, so a finished game can be pushed back through the
+live scoring model play by play to reconstruct the score curve it would have had. For past
+seasons the scoreboard drops the odds, but `pickcenter` still holds the closing line, so the
+`upset` and `pace` terms can be fed properly.
+
+A 71-game college Saturday:
+
+```
+T=70, 60s gate   -> 4 notifications
+T=75, 60s gate   -> 2
+T=75, 180s gate  -> 1
+```
+
+Four 2025 NFL Sundays, about 50 games:
+
+```
+T=70, 60s gate   -> 5, 4, 6, 3   (avg 4.5)
+T=75, 60s gate   -> 3, 2, 6, 1   (avg 3.0)
+T=80, 60s gate   -> 1, 1, 1, 0   (avg 0.8)
+```
+
+Two findings worth keeping. **The same threshold works for both leagues**, which the pregame
+numbers suggest it should not: NFL `anticipation` tops out around 75 against college's 88, but
+live peaks reach 87 against 92. Pregame is dominated by `prominence`, where college's blue bloods
+run away with it; live is dominated by closeness and lateness, and NFL games are tight.
+
+**The time gate is brutal because the model is built that way.** Lateness weighting means scores
+only climb near the end, so most crossings happen inside the final two minutes and a three-minute
+gate removes three quarters of them. Sixty seconds is the compromise: it keeps the genuinely
+early crossings, which are the exceptional games worth interrupting someone for, and drops the
+ones that crossed with twenty seconds left.
+
+### The blowout upset the board could not see
+
+UMass, 29.5-point underdogs, beat Rutgers 37-21. A 45.5-point swing against the line and the
+story of that weekend. The model peaked it at **45.9** and would not have mentioned it, because it
+stopped being competitive at halftime.
+
+The cause is structural rather than a tuning error: `primary` carries 0.58 and measures closeness,
+`upset` carries 0.07. On that game the `upset` term sat pinned at 1.00 for most of the second half
+and moved the total by seven points. The board conflated "watchable" with "close", and a blowout
+upset is neither close nor unwatchable.
+
+What makes an upset compelling is not the margin, it is whether the improbable thing is going to
+happen, which means it peaks while the result is still in doubt and drains once it is settled,
+even as the winning margin grows. Reconstructed from that game:
+
+```
+Q1   7-7    underdog at 13%  ->  tension 0.06    still expected to lose
+Q2  24-7    underdog at 67%  ->  tension 0.59    peak
+Q3  27-7    underdog at 93%  ->  tension 0.25    decided
+Q4  37-21   underdog at 100% ->  tension 0.00    over
+```
+
+Note the first quarter: level at 7-7 against a 29.5-point favourite scores almost nothing, and
+that is correct. Being tied early does not mean much when there are three quarters for the gap to
+reassert itself. The moment is the half.
+
+So `upsetTension` became a third way to earn the dominant term, alongside `core` and `clutch`:
+how far the underdog's live win probability has climbed from where the closing line put it,
+multiplied by how much doubt remains. Magnitude survives the normalisation, so a 29.5-point
+underdog reaching 67% outscores a 7-point underdog reaching 60%.
+
+The game now peaks at **60.8**, at Q2 with UMass 24-7, and decays to 40.1 by the fourth. Checked
+for collateral damage across a full college Saturday and an NFL Sunday: alerts went from 2 to 3
+and 6 to 6, and seven college games reached 0.5+ on the new term without crossing the alert
+threshold. Upsets rank better on the board without adding notification noise, which is right,
+because an upset is a different kind of event and has its own alert category.
+
+**The lesson generalises.** The same argument says the notification rule was wrong too: "underdog
+ahead, within one score" measures the raw margin, and UMass were 16 ahead. The quantity that
+matters is performance against the line, `underdog margin + spread`, which is +45.5 here against
++10 for a seven-point underdog leading by three.
+
+### Concurrency changes the wording, not the decision
+
+How many other games are live is a good measure of how valuable a notification is: the Michigan
+alert fired with 19 other games running, which is exactly the "you are watching the wrong game"
+case. It was tempting to make it a gate, and that was wrong. Two of the NFL alerts fired with
+nothing else live, one of them a game that peaked at 86, and suppressing that assumes the viewer
+is already watching something. They might simply have forgotten it was on. So the count picks the
+phrasing instead: "Switch to X" when there are alternatives, "X is worth putting on" when there
+are not.
+
 ## Regenerating the screenshots
 
 The README shows four panels: live and upcoming, for each league. Only the upcoming pair can be

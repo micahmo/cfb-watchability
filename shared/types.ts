@@ -31,6 +31,8 @@ export interface ScoreComponents {
   core: number;
   /** Endgame drama: one score, clock running out, trailing team with the ball. */
   clutch: number;
+  /** 0..1 for an upset in progress, peaking while the result is still in doubt. */
+  upsetTension: number;
   /** `max(core, clutch)`. The dominant term in every weight profile. */
   primary: number;
   /** How much of the country cares, independent of whether it is close. */
