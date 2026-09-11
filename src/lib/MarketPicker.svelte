@@ -1,7 +1,20 @@
 <script lang="ts">
-  import { prefs, setZip } from "./prefs.svelte";
+  import { clearMarket, prefs, redetectMarket, setZip } from "./prefs.svelte";
 
-  let { stations }: { stations: string[] } = $props();
+  let {
+    stations,
+    detected = null,
+    nudge = false,
+  }: {
+    stations: string[];
+    /** Postal code Cloudflare reported, when the network knew it. */
+    detected?: string | null;
+    /** The slate splits by market and nothing has resolved one. */
+    nudge?: boolean;
+  } = $props();
+
+  /** What the board is actually using, whoever supplied it. */
+  const active = $derived(prefs.marketOff ? null : (prefs.zip ?? detected));
 
   let open = $state(false);
   let draft = $state(prefs.zip ?? "");
@@ -10,11 +23,13 @@
   /* Two or three call signs is enough to recognise your own market at a glance;
      the full list is eight channels of noise. */
   const label = $derived(
-    prefs.zip === null
-      ? "Set market"
+    active === null
+      ? prefs.marketOff
+        ? "Market off"
+        : "Set market"
       : stations.length
-        ? `${prefs.zip} · ${stations.slice(0, 3).join(", ")}`
-        : prefs.zip,
+        ? `${active} · ${stations.slice(0, 3).join(", ")}`
+        : active,
   );
 
   function save(): void {
@@ -24,12 +39,21 @@
 
   function clear(): void {
     draft = "";
-    setZip(null);
+    clearMarket();
+    open = false;
+  }
+
+  function redetect(): void {
+    draft = "";
+    redetectMarket();
     open = false;
   }
 </script>
 
-<button type="button" class="toggle" class:set={prefs.zip !== null} onclick={() => (open = !open)}>
+<button type="button" class="toggle" class:set={active !== null} onclick={() => (open = !open)}>
+  <!-- The whole explanation lives inside the panel. Out here a dot is enough to say
+       there is something to set, and unlike a banner it costs no vertical space. -->
+  {#if nudge && !open}<span class="dot" aria-hidden="true"></span>{/if}
   {label}
   <span class="caret" class:open>▾</span>
 </button>
@@ -37,9 +61,16 @@
 {#if open}
   <div class="panel">
     <p class="hint">
-      On Sunday afternoons the networks split the slate by market, so only one CBS
-      and one FOX game reaches any given city. Your postal code is what turns
-      "regional" into which game is actually on your channels.
+      {#if prefs.marketOff}
+        Market filtering is off, so nothing is flagged as unavailable.
+      {:else if prefs.zip === null && detected !== null}
+        Using <strong>{detected}</strong>, worked out from your connection. Enter a
+        postal code to override it.
+      {:else}
+        On Sunday afternoons the networks split the slate by market, so only one CBS
+        and one FOX game reaches any given city. Your postal code is what turns
+        "regional" into which game is actually on your channels.
+      {/if}
     </p>
     <div class="row">
       <input
@@ -51,11 +82,15 @@
         onkeydown={(e) => e.key === "Enter" && valid && save()}
       />
       <button type="button" class="save" disabled={!valid} onclick={save}>Save</button>
-      {#if prefs.zip !== null}
+      {#if active !== null}
         <button type="button" class="clear" onclick={clear}>Clear</button>
       {/if}
+      <!-- So opting out, or overriding once, is not a one-way door back to typing. -->
+      {#if prefs.marketOff || prefs.zip !== null}
+        <button type="button" class="clear" onclick={redetect}>Redetect</button>
+      {/if}
     </div>
-    {#if prefs.zip !== null && stations.length}
+    {#if active !== null && stations.length}
       <p class="stations">Reading listings for {stations.join(", ")}.</p>
     {/if}
   </div>
@@ -90,6 +125,13 @@
       color: var(--text);
       border-color: var(--border-hi);
     }
+  }
+  .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--warm);
+    flex: none;
   }
   .caret {
     font-size: 10px;

@@ -1,10 +1,9 @@
 <script lang="ts">
   import type { Game, League, Snapshot } from "../shared/types";
-  import { PROFILES, combine } from "../shared/weights";
+  import { DEFAULT_PROFILE, PROFILES, combine } from "../shared/weights";
   import { fetchSnapshot } from "./lib/api";
   import { dayDate, dayKey, dayLabel, relativeTime, scoreColor } from "./lib/format";
   import { isFavourite, prefs } from "./lib/prefs.svelte";
-  import Controls from "./lib/Controls.svelte";
   import LeagueTabs from "./lib/LeagueTabs.svelte";
   import FavouriteConferences from "./lib/FavouriteConferences.svelte";
   import MarketPicker from "./lib/MarketPicker.svelte";
@@ -29,7 +28,7 @@
 
   async function refresh(league: League) {
     try {
-      const next = await fetchSnapshot(league, prefs.zip);
+      const next = await fetchSnapshot(league, prefs.zip, prefs.marketOff);
       // Discard a response that arrived after the user switched tabs.
       if (next.league !== prefs.league) return;
       snapshot = next;
@@ -47,9 +46,10 @@
 
   $effect(() => {
     const league = prefs.league;
-    // Reading the postal code here is deliberate: changing it has to re-run the
-    // effect, since availability is resolved server side.
+    // Read deliberately: changing either has to re-run the effect, since
+    // availability is resolved server side.
     prefs.zip;
+    prefs.marketOff;
     snapshot = null;
     loading = true;
     void refresh(league);
@@ -75,11 +75,16 @@
     return hit ? FAVOURITE_BONUS : 0;
   }
 
-  // The server ships every score component, so switching profiles is instant
-  // and needs no round trip.
+  // The server ships every score component and the browser recombines them, so
+  // favourites reorder the board without a round trip.
   function scoreOf(game: Game): number {
     if (!game.score) return 0;
-    const base = combine(game.score, PROFILES[prefs.profile], game.score.maxTotal);
+    // One fixed weighting. Three selectable profiles shipped for a while and
+    // measurably did nothing: across a full Saturday the top game was identical
+    // under all three, nothing moved more than two places, and what movement
+    // there was landed at positions nine through twelve. Tune these numbers
+    // instead of asking the reader to.
+    const base = combine(game.score, PROFILES[DEFAULT_PROFILE], game.score.maxTotal);
     return Math.min(100, base + favouriteBoost(game));
   }
 
@@ -119,6 +124,19 @@
     }
     return [...names].sort();
   });
+
+  /**
+   * Whether the slate actually contains market-split games, so the nudge only
+   * appears when it would change something. A Thursday night slate is one
+   * national game with nothing to resolve.
+   */
+  const marketMatters = $derived(
+    snapshot?.market == null &&
+      !prefs.marketOff &&
+      [...(snapshot?.live ?? []), ...(snapshot?.upcoming ?? [])].some(
+        (g) => (g.regionalPeers ?? 0) > 1,
+      ),
+  );
 
   /** Conferences present in the current league's slate, for the preference list. */
   const conferences = $derived.by(() => {
@@ -204,9 +222,14 @@
     </div>
   </div>
   <div class="controls-row">
-    <Controls />
     <FavouriteConferences {conferences} league={prefs.league} />
-    {#if prefs.league === "nfl"}<MarketPicker stations={marketStations} />{/if}
+    {#if prefs.league === "nfl"}
+      <MarketPicker
+        stations={marketStations}
+        detected={snapshot?.market?.detected === true ? snapshot.market.zip : null}
+        nudge={marketMatters}
+      />
+    {/if}
   </div>
 </header>
 

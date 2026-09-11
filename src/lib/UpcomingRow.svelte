@@ -6,12 +6,12 @@
 
   const shown = $derived(score ?? game.anticipation ?? 0);
 
-  const regionalPeers = $derived(game.regionalPeers ?? 0);
+  const unavailable = $derived(game.marketStations !== null && game.marketStations.length === 0);
 
   const accent = $derived(scoreColor(shown));
 </script>
 
-<div class="row">
+<div class="row" class:unavailable>
   <div class="score mono" style="color: {accent}">{Math.round(shown)}</div>
   <div class="when mono">
     <span class="time">{kickoffTime(game.startDate)}</span>
@@ -38,14 +38,10 @@
       {#if !game.nationalBroadcast}<span class="local">local feed</span>{/if}
       {#if game.marketStations !== null}
         {#if game.marketStations.length}
-          <span class="on-air">on {game.marketStations.slice(0, 2).join(", ")}</span>
+          <span>on {game.marketStations.slice(0, 2).join(", ")}</span>
         {:else}
-          <span class="local">not on your channels</span>
+          <span>not on your channels</span>
         {/if}
-      {:else if regionalPeers > 1}
-        <span class="local" title="{game.broadcast} is airing {regionalPeers} games in this window and each market only gets one.">
-          regional 1 of {regionalPeers}
-        </span>
       {/if}
     </span>
   </div>
@@ -140,7 +136,7 @@
   .local {
     color: var(--warm);
   }
-  .on-air {
-    color: var(--cool, #6ee7a8);
+  .row.unavailable {
+    opacity: 0.55;
   }
 </style>

@@ -1,10 +1,8 @@
-import { DEFAULT_PROFILE, type ProfileName } from "../../shared/weights";
 import type { League } from "../../shared/types";
 
 const KEY = "football-watchability-prefs";
 
 export interface Prefs {
-  profile: ProfileName;
   league: League;
   /** Conferences to favour, per league. Empty means no preference. */
   favourites: Record<League, string[]>;
@@ -14,13 +12,18 @@ export interface Prefs {
    * same board serves someone in Boston and someone in Dallas correctly.
    */
   zip: string | null;
+  /**
+   * Explicitly opted out of market filtering. Distinct from `zip: null`, which
+   * means "work it out for me": this one means "do not, even if you can".
+   */
+  marketOff: boolean;
 }
 
 const DEFAULTS: Prefs = {
-  profile: DEFAULT_PROFILE,
   league: "nfl",
   favourites: { nfl: [], cfb: [] },
   zip: null,
+  marketOff: false,
 };
 
 function load(): Prefs {
@@ -49,8 +52,23 @@ export function persist(): void {
   }
 }
 
-export function setZip(zip: string | null): void {
-  prefs.zip = zip !== null && /^\d{5}$/.test(zip) ? zip : null;
+export function setZip(zip: string): void {
+  prefs.zip = /^\d{5}$/.test(zip) ? zip : null;
+  prefs.marketOff = false;
+  persist();
+}
+
+/** No market at all, not even a detected one. */
+export function clearMarket(): void {
+  prefs.zip = null;
+  prefs.marketOff = true;
+  persist();
+}
+
+/** Back to whatever the network says, without retyping anything. */
+export function redetectMarket(): void {
+  prefs.zip = null;
+  prefs.marketOff = false;
   persist();
 }
 

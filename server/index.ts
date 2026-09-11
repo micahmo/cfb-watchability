@@ -32,9 +32,33 @@ const pollers: Record<League, LeaguePoller> = {
 const DEFAULT_LEAGUE: League = "nfl";
 
 /** Five digits, or nothing. Anything else is not worth a call upstream. */
+function validZip(value: string | null | undefined): string | null {
+  return typeof value === "string" && /^\d{5}$/.test(value) ? value : null;
+}
+
 function zipFrom(url: string): string | null {
-  const value = new URL(url, "http://localhost").searchParams.get("zip");
-  return value !== null && /^\d{5}$/.test(value) ? value : null;
+  return validZip(new URL(url, "http://localhost").searchParams.get("zip"));
+}
+
+/**
+ * The viewer's postal code as Cloudflare sees it, when the board is reached
+ * through the tunnel and the zone has visitor location headers switched on.
+ *
+ * Saves asking for something the network already knows. Only ever used as a
+ * default: an explicit `zip` always wins, because IP geolocation lands in the
+ * right metro but not necessarily the right one of two nearby markets.
+ *
+ * Trusting a request header is safe here precisely because it is per request. A
+ * client that forges one only changes the listings in its own response, which it
+ * could do by typing a different postal code anyway.
+ */
+function detectedZip(req: http.IncomingMessage): string | null {
+  const headers = req.headers;
+  return (
+    validZip(headers["cf-postal-code"] as string) ??
+    validZip(headers["cf-ippostalcode"] as string) ??
+    null
+  );
 }
 
 /**
@@ -44,7 +68,11 @@ function zipFrom(url: string): string | null {
  * asking: two people on the same board in different cities get different games
  * out of the same slate.
  */
-async function withMarket(snapshot: Snapshot, zip: string): Promise<Snapshot> {
+async function withMarket(
+  snapshot: Snapshot,
+  zip: string,
+  detected: boolean,
+): Promise<Snapshot> {
   const games = [...snapshot.live, ...snapshot.upcoming, ...snapshot.recent];
   const market = await listings.get(zip, games);
   if (market === null) return snapshot;
@@ -63,7 +91,7 @@ async function withMarket(snapshot: Snapshot, zip: string): Promise<Snapshot> {
     live: snapshot.live.map(annotate),
     upcoming: snapshot.upcoming.map(annotate),
     recent: snapshot.recent.map(annotate),
-    market: { zip, stations: market.stations },
+    market: { zip, stations: market.stations, detected },
   };
 }
 
@@ -142,11 +170,16 @@ function handleRequest(req: http.IncomingMessage, res: http.ServerResponse): voi
 
   if (url === "/api/snapshot") {
     const league = leagueFrom(raw);
-    const zip = zipFrom(raw);
+    const chosen = zipFrom(raw);
+    const optedOut = new URL(raw, "http://localhost").searchParams.get("market") === "off";
+    const detected = optedOut ? null : detectedZip(req);
+    const zip = optedOut ? null : (chosen ?? detected);
     const base = pollers[league].snapshot;
     // Only the NFL splits a slate by market; college games are on cable.
     const ready =
-      zip !== null && league === "nfl" ? withMarket(base, zip) : Promise.resolve(base);
+      zip !== null && league === "nfl"
+        ? withMarket(base, zip, chosen === null)
+        : Promise.resolve(base);
     void ready
       .catch((err) => {
         console.error(`[http] market lookup failed: ${err instanceof Error ? err.message : err}`);

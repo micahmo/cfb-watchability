@@ -30,8 +30,8 @@ line, the over/under and the network.
 
 **Just finished**, the recent recap, best first.
 
-**League tabs** switch between NFL and college. The NFL opens by default. Your tab, weight
-profile, favourite conferences and postal code all persist in the browser.
+**League tabs** switch between NFL and college. The NFL opens by default. Your tab, favourite
+conferences and postal code all persist in the browser.
 
 **Favourite conferences** push the games you care about up the board. Tick AFC, or the SEC, and
 matchups involving those get a bonus applied client side, so it reorders instantly.
@@ -95,20 +95,26 @@ unranked". A live line is no good either, because it moves with the game and pri
 the surprise away. The ranking gap survives at 60% strength as a fallback, so an
 unranked team beating a ranked one still registers.
 
-### Weight profiles
+### One weighting, not a dial
 
-Whether "the best game" means the closest game or the biggest one is a taste
-question, so it is a control rather than a fixed answer. Each profile sums to 1.
+An earlier version shipped three selectable profiles, trading closeness against
+prominence. Measured against a full Saturday of finished games, the top-ranked game
+was **identical under all three**, nothing moved more than two positions, and what
+movement there was happened at positions nine through twelve. It also never applied
+to the upcoming list at all. A control that cannot change the answer is not a
+control, so the weights are now fixed and tuned directly:
 
-| Profile | Closeness | Prominence | Reads as |
-| --- | --- | --- | --- |
-| Best game | 0.74 | 0.04 | Purely how close and how late |
-| Balanced (default) | 0.58 | 0.18 | Closeness first, big programs break ties |
-| Biggest game | 0.42 | 0.36 | Favour what the country is watching |
+| Component | Weight |
+| --- | --- |
+| `primary` (closeness, weighted by how late) | 0.58 |
+| `prominence` | 0.18 |
+| `swing` | 0.08 |
+| `upset` | 0.07 |
+| `stakes` | 0.05 |
+| `pace` | 0.04 |
 
-The server ships every component and the browser recombines them, so switching is
-instant. A game with a 25-point margin past the 80% mark is capped at 8 regardless
-of what the other terms think.
+They sum to 1, so a total is always 0-100. A game with a 25-point margin past the
+80% mark is capped at 8 regardless of what the other terms think.
 
 ### Before kickoff
 
@@ -155,17 +161,37 @@ out in two layers.
 
 **Without a postal code**, regionality is derived from the slate itself. A network can only air
 one game per window in any one market, so whenever CBS or FOX carries several games in the same
-kickoff window, those games are by definition being divided up. Games get flagged
-`regional - 1 of 4`. College is deliberately excluded: fifteen concurrent games under "ESPN+"
-are fifteen separate streams, not a market split, and the same count would lie.
+kickoff window, those games are by definition being divided up. That fact is worth saying exactly
+once, as a single prompt to set a postal code, and it is not worth a badge on every row: with no
+market set, every 1:00 game is equally regional, which is noise rather than a signal. College is
+deliberately excluded from the inference: fifteen concurrent games under "ESPN+" are fifteen
+separate streams, not a market split, and the same count would lie.
 
 **With a postal code**, the board reads the public Gracenote listings grid and reports which
 game your own affiliates are carrying, as `on WBZ, WPRI` or `not on your channels`. Games your
 market is not showing keep their real score, because the score says how good the game is, but
-they sort below the ones you can get.
+they fade back and sort below the ones you can get. An absence is not a warning, so it is drawn
+quietly rather than in a colour that competes with the scores.
 
-The postal code lives in the browser, not on the server, so the same board serves someone in
-Boston and someone in Dallas correctly.
+**Usually you do not have to type one.** Behind Cloudflare, switching on the managed transform
+*Add visitor location headers* makes every request carry `CF-Postal-Code`, and the board uses it
+as the default market. An explicitly entered postal code always wins, because IP geolocation
+reliably lands in the right metro but not always the right one of two neighbouring markets.
+
+Trusting that header is safe because it is per request: forging one only changes the listings in
+your own response, which you could do by typing a different postal code anyway.
+
+The market control has three states, because "work it out for me" and "do not filter at all" are
+different requests: a postal code you typed, the detected one, and explicitly off. **Clear** turns
+it off entirely rather than falling back to detection, and **Redetect** goes back to the network's
+answer without making you retype anything.
+
+With no postal code from any source, nothing is flagged at all. Every 1:00 game is then
+equally uncertain, and a badge on four-fifths of the board is wallpaper rather than a signal, so
+the board says it once as a dot on the market control and otherwise stays out of the way.
+
+An explicit postal code lives in the browser, not on the server, so the same board serves someone
+in Boston and someone in Dallas correctly.
 
 Fuller reasoning, and the games that forced each of these decisions, are in
 [docs/design-notes.md](docs/design-notes.md).
