@@ -1,7 +1,6 @@
-# <img src="public/icon-192.png" width="32" align="absmiddle" alt=""> College Football: What Should I Be Watching
+# <img src="public/icon-192.png" width="32" align="absmiddle" alt=""> Football: What Should I Be Watching
 
-A live board that answers one question: **which college football game should I have on right
-now?**
+A live board that answers one question: **which football game should I have on right now?**
 
 Rankings and records tell you which games *matter*. They do not tell you which game is
 currently a one-score fight with four minutes left. This polls the public ESPN scoreboard and
@@ -112,11 +111,11 @@ CI publishes an image to GHCR on every push to `main`. The compiled server has n
 dependencies beyond Node itself.
 
 ```bash
-docker run -d --name cfb-watchability \
+docker run -d --name football-watchability \
   -p 8787:8787 \
   -e TZ=America/New_York \
   --restart unless-stopped \
-  ghcr.io/micahmo/cfb-watchability:latest
+  ghcr.io/micahmo/football-watchability:latest
 ```
 
 There are no volumes and no database. All state is in memory and rebuilds from ESPN within a
@@ -127,7 +126,7 @@ minutes.
 **Set `TZ` to US Eastern or near it.** The poller asks ESPN for "yesterday through today", and
 those day boundaries are what keep a game running past midnight visible.
 
-An Unraid template is included at [unraid/cfb-watchability.xml](unraid/cfb-watchability.xml).
+An Unraid template is included at [unraid/football-watchability.xml](unraid/football-watchability.xml).
 
 ### Behind a reverse proxy
 

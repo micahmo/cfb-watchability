@@ -109,7 +109,7 @@
     </div>
   </div>
   <p class="sub">
-    Live college football, ranked by how good the game is <em>right now</em>.
+    Live football, ranked by how good the game is <em>right now</em>.
     {#if snapshot?.season}
       <span class="week">{snapshot.season} · week {snapshot.week}</span>
     {/if}

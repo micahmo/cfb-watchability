@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "name": "College Football: What Should I Be Watching",
-  "short_name": "CFB",
-  "description": "Live college football, ranked by how good each game is right now.",
+  "name": "Football: What Should I Be Watching",
+  "short_name": "Football",
+  "description": "Live football, ranked by how good each game is right now.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

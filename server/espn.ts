@@ -144,7 +144,7 @@ export async function fetchScoreboard(opts: FetchOptions = {}): Promise<Scoreboa
     headers: {
       accept: "application/json",
       // Identify ourselves rather than showing up as an anonymous bot.
-      "user-agent": "cfb-watchability/0.1 (personal dashboard)",
+      "user-agent": "football-watchability/0.1 (personal dashboard)",
     },
     signal: AbortSignal.timeout(15_000),
   });
@@ -182,7 +182,7 @@ export async function fetchPregameLine(
   const res = await fetch(`${SUMMARY}?event=${encodeURIComponent(eventId)}`, {
     headers: {
       accept: "application/json",
-      "user-agent": "cfb-watchability/0.1 (personal dashboard)",
+      "user-agent": "football-watchability/0.1 (personal dashboard)",
     },
     signal: AbortSignal.timeout(15_000),
   });

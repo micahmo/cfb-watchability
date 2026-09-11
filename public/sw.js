@@ -10,7 +10,7 @@
  * meant a deploy did not reach the phone until the *second* load. Network-first
  * keeps offline support while never showing yesterday's app.
  */
-const CACHE = "cfb-watchability-v2";
+const CACHE = "football-watchability-v3";
 const SHELL = ["/", "/index.html", "/manifest.webmanifest", "/icon-192.png", "/icon-512.png"];
 
 self.addEventListener("install", (event) => {

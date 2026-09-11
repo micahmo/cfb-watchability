@@ -1,6 +1,6 @@
 import { DEFAULT_PROFILE, type ProfileName } from "../../shared/weights";
 
-const KEY = "cfb-watchability-prefs";
+const KEY = "football-watchability-prefs";
 
 export interface Prefs {
   profile: ProfileName;
