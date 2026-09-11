@@ -84,6 +84,7 @@ function withScore(raw: RawGame, swingMovement: number): Game {
   const line = lines.get(raw.id);
   const breakdown = scoreGame({
     homeSpread: line?.homeSpread ?? raw.homeSpread,
+    overUnder: line?.overUnder ?? raw.overUnder,
     period,
     clockSeconds,
     home: raw.home,

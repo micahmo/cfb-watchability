@@ -145,9 +145,25 @@ export function stakesScore(home: TeamSide, away: TeamSide, conferenceGame: bool
 }
 
 /** A 45-38 track meet is worth watching even when it is not especially close. */
-export function paceScore(totalPoints: number, progress: number): number {
-  if (progress < 0.08) return 0;
-  const projected = totalPoints / progress;
+/**
+ * Expected final points, as a 0..1 rating.
+ *
+ * Dividing points so far by elapsed fraction alone is wildly unstable early: two
+ * touchdowns in the first seven minutes projects a 113-point game. So the observed
+ * rate is shrunk toward a prior, which is the pregame over/under when we have one,
+ * weighted by how much of the game has actually been played.
+ */
+const DEFAULT_EXPECTED_TOTAL = 55;
+
+export function paceScore(
+  totalPoints: number,
+  progress: number,
+  overUnder: number | null = null,
+): number {
+  const prior = overUnder ?? DEFAULT_EXPECTED_TOTAL;
+  if (progress < 0.08) return clamp((prior - 35) / 35);
+  const observed = totalPoints / progress;
+  const projected = prior * (1 - progress) + observed * progress;
   return clamp((projected - 35) / 35);
 }
 
@@ -187,6 +203,8 @@ export interface ScoreInputs {
   network: string | null;
   /** Pregame closing spread, home-relative. Null when we have no line. */
   homeSpread: number | null;
+  /** Pregame closing over/under, used only to steady the early pace estimate. */
+  overUnder: number | null;
   /** Scores a completed game retrospectively instead of as a live situation. */
   isFinal?: boolean;
 }
@@ -250,7 +268,7 @@ export function scoreGame(input: ScoreInputs): ScoreBreakdown {
     swing: swingScore(input.swingMovement),
     upset: combinedUpset(input, progress),
     stakes: stakesScore(input.home, input.away, input.conferenceGame),
-    pace: paceScore(totalPoints, progress),
+    pace: paceScore(totalPoints, progress, input.overUnder),
   };
 
   // A four-score game in the fourth quarter is over regardless of what the
@@ -265,8 +283,13 @@ export function scoreGame(input: ScoreInputs): ScoreBreakdown {
   };
 }
 
-/** Blowouts pile up points too, so a shootout has to also have been contested. */
-const SHOOTOUT_MAX_MARGIN = 17;
+/**
+ * A shootout is an observation, not a prediction: the points have to already be on
+ * the board, and the game has to be close. A blowout piles up points too, and
+ * "on pace for" means nothing in the first quarter.
+ */
+const SHOOTOUT_MIN_POINTS = 52;
+const SHOOTOUT_MAX_MARGIN = 10;
 
 /** Beating the closing line by three touchdowns is a maximal upset. */
 const MAX_VS_LINE = 21;
@@ -350,7 +373,9 @@ export function buildTags(game: Game, breakdown: ScoreBreakdown): string[] {
   // is expected to appear and fade as a game settles. A permanent "wild game"
   // badge would point you at games that have since stopped being close.
   if (breakdown.swing >= 0.6) tags.push("RECENT SWINGS");
-  if (breakdown.pace >= 0.7 && game.margin <= SHOOTOUT_MAX_MARGIN) tags.push("SHOOTOUT");
+  if (game.totalPoints >= SHOOTOUT_MIN_POINTS && game.margin <= SHOOTOUT_MAX_MARGIN) {
+    tags.push("SHOOTOUT");
+  }
   if (hr <= 10 && ar <= 10) tags.push("TOP-10 CLASH");
   return tags;
 }
