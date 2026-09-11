@@ -1,0 +1,2 @@
+# Shell scripts must keep LF: CRLF makes the kernel fail to find /bin/sh.
+*.sh text eol=lf
