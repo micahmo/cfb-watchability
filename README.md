@@ -29,8 +29,7 @@ situation, who has the ball, the network, the pregame line, and any tags that ap
 earlier day's games are never buried under a better game later in the week. Each row shows
 kickoff time, the line, the over/under and the network.
 
-**Just finished**, the recent recap, best first. Games stay for eighteen hours, so last night is
-still there over breakfast.
+**Just finished**, the recent recap, best first. Games stay on the board for eighteen hours.
 
 **League tabs** switch between NFL and college; the NFL opens by default. **Favourite
 conferences** push the games you care about up the board, weighted higher when both teams
@@ -92,9 +91,9 @@ fires at 75.
 A great game you cannot get is not a recommendation. On Sunday afternoons the networks split the
 slate by market: eight games kick at 1:00, but only one CBS and one FOX game reaches any city.
 
-ESPN cannot answer this, so the board reads the public Gracenote listings grid for your postal
-code and reports which of them your own affiliates are carrying. Games your market is not showing
-keep their real score but fade back and sort below the ones you can get.
+The board reads the Gracenote listings grid for your postal code and reports which of them your
+own affiliates are carrying. Games your market is not showing keep their real score but fade back
+and sort below the ones you can get.
 
 Behind Cloudflare you do not have to type a postal code: switch on the managed transform *Add
 visitor location headers* and the board uses `CF-Postal-Code` as the default market. The control
@@ -206,8 +205,6 @@ unraid/     container template
 - Where no closing line exists, mostly FCS matchups, upset detection falls back to the rank gap,
   which cannot tell a mismatch from a coin flip.
 - Swing history is in memory only, so a restart suppresses `RECENT SWINGS` until it refills.
-- **The listings grid refuses non-browser clients**, so the market lookup sends a browser
-  `User-Agent`. Results are cached six hours per market.
-- Without a postal code, nothing is flagged as unavailable at all.
+- Market listings are cached for six hours, so a lineup change can take that long to show.
 - NFL prominence leans on records and seeding, so it is near-flat in week one when everyone is
   0-0 and sharpens as the season goes.
