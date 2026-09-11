@@ -312,9 +312,16 @@
             <span class="day-date">{day.date}</span>
           </h3>
           <div class="panel tight">
-            {#each day.available as game (game.id)}
-              <UpcomingRow {game} score={anticipationOf(game)} />
-            {/each}
+            <!-- Wrapped so the last available row is a :last-child and drops its
+                 bottom border. That border drew a line directly above the header
+                 below, which together with the first unavailable row's own border
+                 boxed the two into what looked like a single entry. A section
+                 header should sit in whitespace, not inside a cell. -->
+            <div class="tier">
+              {#each day.available as game (game.id)}
+                <UpcomingRow {game} score={anticipationOf(game)} />
+              {/each}
+            </div>
             {#if day.unavailable.length > 0}
               <div class="blocked">
                 <p class="cutoff">not on your channels</p>
