@@ -17,7 +17,7 @@ WORKDIR /app
 # tzdata is needed for TZ to resolve: the poller asks ESPN for "yesterday through
 # today", and those day boundaries have to be in US Eastern or late kickoffs fall
 # outside the window.
-RUN apk add --no-cache tzdata wget su-exec
+RUN apk add --no-cache tzdata wget
 
 # Production dependencies only. The server ran on the Node standard library alone
 # until web push arrived, which needs VAPID signing and payload encryption and is
@@ -28,21 +28,22 @@ RUN npm ci --omit=dev && npm cache clean --force
 
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/dist-server ./dist-server
-COPY docker-entrypoint.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 ENV NODE_ENV=production \
     PORT=8787 \
     HOST=0.0.0.0 \
     DIST_DIR=/app/dist \
-    TZ=America/New_York \
-    PUID=1000 \
-    PGID=1000
+    TZ=America/New_York
 
 EXPOSE 8787
+
+# Never root. The uid only has to match whoever owns the notification volume, and
+# that is the operator's call at run time: `--user 99:100` on Unraid, where
+# appdata is already owned that way. Switching uid *inside* the container would
+# mean starting as root purely to chown, which buys nothing here.
+USER node
 
 HEALTHCHECK --interval=60s --timeout=5s --start-period=20s --retries=3 \
   CMD wget -qO- http://127.0.0.1:8787/api/health >/dev/null || exit 1
 
-ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["node", "dist-server/server/index.js"]
