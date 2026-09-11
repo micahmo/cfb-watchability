@@ -8,12 +8,19 @@ export interface Prefs {
   league: League;
   /** Conferences to favour, per league. Empty means no preference. */
   favourites: Record<League, string[]>;
+  /**
+   * Postal code, used to work out which regional NFL game this viewer's own
+   * channels are carrying. Kept per browser rather than on the server, so the
+   * same board serves someone in Boston and someone in Dallas correctly.
+   */
+  zip: string | null;
 }
 
 const DEFAULTS: Prefs = {
   profile: DEFAULT_PROFILE,
   league: "nfl",
   favourites: { nfl: [], cfb: [] },
+  zip: null,
 };
 
 function load(): Prefs {
@@ -40,6 +47,11 @@ export function persist(): void {
   } catch {
     // Losing preferences is survivable; breaking the board is not.
   }
+}
+
+export function setZip(zip: string | null): void {
+  prefs.zip = zip !== null && /^\d{5}$/.test(zip) ? zip : null;
+  persist();
 }
 
 export function isFavourite(league: League, conference: string | null): boolean {

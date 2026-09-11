@@ -25,6 +25,7 @@
         : "away",
   );
   const clockText = $derived(clockLabel(game));
+  const regionalPeers = $derived(game.regionalPeers ?? 0);
   const showPossession = $derived(variant === "live" && game.possessionTeamId !== null);
 
   /** Home-relative spread: negative means the home team was favoured. */
@@ -101,6 +102,17 @@
       {#if variant === "final"}<span class="final-chip">FINAL</span>{/if}
       {#if game.broadcast}<span class="channel-chip">{game.broadcast}</span>{/if}
       {#if !game.nationalBroadcast}<span class="note warn">local feed</span>{/if}
+      {#if game.marketStations !== null}
+        {#if game.marketStations.length}
+          <span class="note on-air">on {game.marketStations.slice(0, 2).join(", ")}</span>
+        {:else}
+          <span class="note warn">not on your channels</span>
+        {/if}
+      {:else if regionalPeers > 1}
+        <span class="note warn" title="{game.broadcast} is airing {regionalPeers} games in this window and each market only gets one.">
+          regional &middot; 1 of {regionalPeers}
+        </span>
+      {/if}
       {#if game.conferenceGame}<span class="note">conference game</span>{/if}
       {#each game.tags as tag (tag)}
         <span class="tag" class:hot={HOT_TAGS.has(tag)}>{tag}</span>
@@ -270,6 +282,11 @@
   .note.warn {
     color: var(--warm);
     border-color: rgba(255, 165, 61, 0.35);
+  }
+  /* The one label here that is good news, so it should not read as a warning. */
+  .note.on-air {
+    color: var(--cool, #6ee7a8);
+    border-color: rgba(110, 231, 168, 0.35);
   }
   /* Clock and situation are both mono digits, so without a rule between them
      "0:50 3rd 2nd & 10 at SMU 39" reads as one run-on string. */

@@ -4,7 +4,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { LeaguePoller } from "./poller.js";
 import { StandingsStore } from "./standings.js";
-import type { League } from "../shared/types.js";
+import { ListingsStore } from "./listings.js";
+import type { Game, League, Snapshot } from "../shared/types.js";
 
 const PORT = Number(process.env.PORT ?? 8787);
 /** Bind all interfaces by default so other devices on the LAN can reach the board. */
@@ -18,6 +19,7 @@ const distDir = process.env.DIST_DIR
   : path.resolve(here, "..", "dist");
 
 const standings = new StandingsStore();
+const listings = new ListingsStore();
 
 /** Each league polls independently, so a quiet NFL week cannot slow a busy Saturday. */
 const pollers: Record<League, LeaguePoller> = {
@@ -28,6 +30,42 @@ const pollers: Record<League, LeaguePoller> = {
 };
 
 const DEFAULT_LEAGUE: League = "nfl";
+
+/** Five digits, or nothing. Anything else is not worth a call upstream. */
+function zipFrom(url: string): string | null {
+  const value = new URL(url, "http://localhost").searchParams.get("zip");
+  return value !== null && /^\d{5}$/.test(value) ? value : null;
+}
+
+/**
+ * Marks up a snapshot with what the viewer's own market is actually carrying.
+ *
+ * Done per request rather than per poll because the answer depends on who is
+ * asking: two people on the same board in different cities get different games
+ * out of the same slate.
+ */
+async function withMarket(snapshot: Snapshot, zip: string): Promise<Snapshot> {
+  const games = [...snapshot.live, ...snapshot.upcoming, ...snapshot.recent];
+  const market = await listings.get(zip, games);
+  if (market === null) return snapshot;
+
+  const annotate = (game: Game): Game => ({
+    ...game,
+    // Only the market-split games need an answer. A national broadcast is on
+    // everywhere, and saying "not on your channels" because the grid happens not
+    // to list ESPN would be worse than saying nothing.
+    marketStations:
+      (game.regionalPeers ?? 0) > 1 ? (listings.lookup(market, game)?.stations ?? []) : null,
+  });
+
+  return {
+    ...snapshot,
+    live: snapshot.live.map(annotate),
+    upcoming: snapshot.upcoming.map(annotate),
+    recent: snapshot.recent.map(annotate),
+    market: { zip, stations: market.stations },
+  };
+}
 
 function leagueFrom(url: string): League {
   const value = new URL(url, "http://localhost").searchParams.get("league");
@@ -103,12 +141,25 @@ function handleRequest(req: http.IncomingMessage, res: http.ServerResponse): voi
   }
 
   if (url === "/api/snapshot") {
-    res.writeHead(200, {
-      "content-type": "application/json; charset=utf-8",
-      "cache-control": "no-store",
-      "access-control-allow-origin": "*",
-    });
-    res.end(JSON.stringify(pollers[leagueFrom(raw)].snapshot));
+    const league = leagueFrom(raw);
+    const zip = zipFrom(raw);
+    const base = pollers[league].snapshot;
+    // Only the NFL splits a slate by market; college games are on cable.
+    const ready =
+      zip !== null && league === "nfl" ? withMarket(base, zip) : Promise.resolve(base);
+    void ready
+      .catch((err) => {
+        console.error(`[http] market lookup failed: ${err instanceof Error ? err.message : err}`);
+        return base;
+      })
+      .then((snapshot) => {
+        res.writeHead(200, {
+          "content-type": "application/json; charset=utf-8",
+          "cache-control": "no-store",
+          "access-control-allow-origin": "*",
+        });
+        res.end(JSON.stringify(snapshot));
+      });
     return;
   }
 

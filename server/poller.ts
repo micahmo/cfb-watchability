@@ -73,6 +73,7 @@ export class LeaguePoller {
       live: [],
       upcoming: [],
       recent: [],
+      market: null,
       error: null,
     };
   }
@@ -257,6 +258,7 @@ export class LeaguePoller {
         live,
         upcoming,
         recent,
+        market: null,
         error: null,
       };
       console.log(

@@ -6,6 +6,8 @@
 
   const shown = $derived(score ?? game.anticipation ?? 0);
 
+  const regionalPeers = $derived(game.regionalPeers ?? 0);
+
   const accent = $derived(scoreColor(shown));
 </script>
 
@@ -34,6 +36,17 @@
       {#if game.odds}<span>{game.odds}</span>{/if}
       {#if game.overUnder}<span>o/u {game.overUnder}</span>{/if}
       {#if !game.nationalBroadcast}<span class="local">local feed</span>{/if}
+      {#if game.marketStations !== null}
+        {#if game.marketStations.length}
+          <span class="on-air">on {game.marketStations.slice(0, 2).join(", ")}</span>
+        {:else}
+          <span class="local">not on your channels</span>
+        {/if}
+      {:else if regionalPeers > 1}
+        <span class="local" title="{game.broadcast} is airing {regionalPeers} games in this window and each market only gets one.">
+          regional 1 of {regionalPeers}
+        </span>
+      {/if}
     </span>
   </div>
 </div>
@@ -126,5 +139,8 @@
   }
   .local {
     color: var(--warm);
+  }
+  .on-air {
+    color: var(--cool, #6ee7a8);
   }
 </style>

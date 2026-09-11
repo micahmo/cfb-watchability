@@ -7,6 +7,7 @@
   import Controls from "./lib/Controls.svelte";
   import LeagueTabs from "./lib/LeagueTabs.svelte";
   import FavouriteConferences from "./lib/FavouriteConferences.svelte";
+  import MarketPicker from "./lib/MarketPicker.svelte";
   import GameCard from "./lib/GameCard.svelte";
   import UpcomingRow from "./lib/UpcomingRow.svelte";
 
@@ -26,7 +27,7 @@
 
   async function refresh(league: League) {
     try {
-      const next = await fetchSnapshot(league);
+      const next = await fetchSnapshot(league, prefs.zip);
       // Discard a response that arrived after the user switched tabs.
       if (next.league !== prefs.league) return;
       snapshot = next;
@@ -41,6 +42,9 @@
 
   $effect(() => {
     const league = prefs.league;
+    // Reading the postal code here is deliberate: changing it has to re-run the
+    // effect, since availability is resolved server side.
+    prefs.zip;
     snapshot = null;
     loading = true;
     void refresh(league);
@@ -78,6 +82,39 @@
     return Math.min(100, (game.anticipation ?? 0) + favouriteBoost(game));
   }
 
+  /**
+   * A game the viewer's own channels are not carrying still gets its real score,
+   * because the score says how good the game is. It just stops being offered
+   * first, since recommending something unwatchable is no recommendation at all.
+   */
+  function watchable(game: Game): boolean {
+    return game.marketStations === null || game.marketStations.length > 0;
+  }
+
+  function byWatchableThen(
+    rank: (game: Game) => number,
+  ): (a: Game, b: Game) => number {
+    return (a, b) =>
+      Number(watchable(b)) - Number(watchable(a)) || rank(b) - rank(a);
+  }
+
+  /**
+   * The stations that decide anything: the ones carrying a market-split game.
+   * Every NFL affiliate in the market also carries the national games, so the
+   * server's full list runs to eight call signs and says nothing useful.
+   */
+  const marketStations = $derived.by(() => {
+    const names = new Set<string>();
+    for (const game of [
+      ...(snapshot?.live ?? []),
+      ...(snapshot?.upcoming ?? []),
+      ...(snapshot?.recent ?? []),
+    ]) {
+      for (const station of game.marketStations ?? []) names.add(station);
+    }
+    return [...names].sort();
+  });
+
   /** Conferences present in the current league's slate, for the preference list. */
   const conferences = $derived.by(() => {
     const all = [
@@ -94,7 +131,7 @@
   });
 
   const live = $derived.by(() =>
-    [...(snapshot?.live ?? [])].sort((a, b) => scoreOf(b) - scoreOf(a)),
+    [...(snapshot?.live ?? [])].sort(byWatchableThen(scoreOf)),
   );
 
   const top = $derived(live[0] ?? null);
@@ -124,7 +161,7 @@
       .sort(([a], [b]) => a.localeCompare(b))
       .slice(0, MAX_DAYS)
       .map(([key, games]) => {
-        const ranked = [...games].sort((a, b) => anticipationOf(b) - anticipationOf(a));
+        const ranked = [...games].sort(byWatchableThen(anticipationOf));
         const showAll = expanded[key] === true;
         return {
           key,
@@ -164,6 +201,7 @@
   <div class="controls-row">
     <Controls />
     <FavouriteConferences {conferences} league={prefs.league} />
+    {#if prefs.league === "nfl"}<MarketPicker stations={marketStations} />{/if}
   </div>
 </header>
 

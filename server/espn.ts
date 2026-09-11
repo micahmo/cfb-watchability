@@ -124,6 +124,10 @@ function normalize(event: any, league: League): RawGame | null {
   return {
     id: String(event.id),
     league,
+    // Slate-level, so it cannot be known from a single event. Stamped below.
+    regionalPeers: null,
+    // Depends on who is asking, so it is resolved per request, not per poll.
+    marketStations: null,
     state,
     name: event.name ?? `${away.displayName} at ${home.displayName}`,
     shortName: event.shortName ?? `${away.abbrev} @ ${home.abbrev}`,
@@ -157,6 +161,53 @@ function normalize(event: any, league: League): RawGame | null {
   };
 }
 
+/** Kickoff hour in Eastern time, which is the calendar the NFL windows are set on. */
+function easternSlot(startDate: string): string | null {
+  const at = Date.parse(startDate);
+  if (!Number.isFinite(at)) return null;
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/New_York",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    hour12: false,
+  }).formatToParts(new Date(at));
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
+  return `${get("year")}-${get("month")}-${get("day")}T${get("hour")}`;
+}
+
+/**
+ * Flags the Sunday afternoon games that only reach part of the country.
+ *
+ * ESPN is no help directly: it labels every NFL game "National", including the
+ * 1:00 CBS and FOX games that are plainly regional, and the published coverage
+ * maps are behind a bot wall. But the split is visible in the slate itself. A
+ * network can only air one game per window in any one market, so whenever CBS or
+ * FOX carries several games in the same window, those games are by definition
+ * being divided up by market.
+ *
+ * College is left alone on purpose: fifteen concurrent games under "ESPN+" are
+ * fifteen separate streams, not a market split, so the same count would lie.
+ */
+function markRegionalBroadcasts(games: RawGame[], league: League): void {
+  if (league !== "nfl") return;
+  const counts = new Map<string, number>();
+  const keyOf = (g: RawGame): string | null => {
+    const slot = easternSlot(g.startDate);
+    if (slot === null || !g.broadcast) return null;
+    return `${g.broadcast}|${slot}`;
+  };
+  for (const game of games) {
+    const key = keyOf(game);
+    if (key !== null) counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  for (const game of games) {
+    const key = keyOf(game);
+    game.regionalPeers = key === null ? null : (counts.get(key) ?? 1);
+  }
+}
+
 export async function fetchScoreboard(opts: FetchOptions): Promise<ScoreboardResult> {
   const params = new URLSearchParams({ limit: String(opts.limit ?? 200) });
   // Sending groups to the NFL endpoint returns an empty slate.
@@ -180,6 +231,7 @@ export async function fetchScoreboard(opts: FetchOptions): Promise<ScoreboardRes
   const games = (body?.events ?? [])
     .map((e: unknown) => normalize(e, opts.league))
     .filter((g: RawGame | null): g is RawGame => g !== null);
+  markRegionalBroadcasts(games, opts.league);
 
   return {
     season: body?.season?.year ?? null,

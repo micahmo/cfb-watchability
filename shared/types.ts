@@ -73,6 +73,21 @@ export interface Game {
   broadcastTier: number;
   /** False for home/away market feeds, which are not carried nationally. */
   nationalBroadcast: boolean;
+  /**
+   * NFL only: how many games share this network and kickoff window. Above one,
+   * the network is splitting the slate by market and only one of those games
+   * reaches any given city, so a high score here is not a promise you can watch
+   * it. Null for college, where concurrent games under one "network" are usually
+   * separate streams rather than a market split.
+   */
+  regionalPeers: number | null;
+  /**
+   * Call signs in the viewer's own market carrying this game, once a postal code
+   * is set. An empty array is a real answer and the important one: the market is
+   * showing something else in this window, so however good the game is, it is not
+   * on. Null means no postal code, so availability is simply unknown.
+   */
+  marketStations: string[] | null;
   /** Team id currently with the ball, when ESPN publishes it. */
   possessionTeamId: string | null;
   /** e.g. "3rd & 6 at FSU 21". Null outside live play. */
@@ -109,4 +124,6 @@ export interface Snapshot {
   upcoming: Game[];
   recent: Game[];
   error: string | null;
+  /** The viewer's resolved market, when they have set a postal code. */
+  market: { zip: string; stations: string[] } | null;
 }
