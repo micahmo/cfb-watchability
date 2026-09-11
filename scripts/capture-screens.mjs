@@ -27,6 +27,17 @@ const docs = path.resolve(here, "..", "docs");
 /** A tall phone: the board is read on one, and it is where the layout is tightest. */
 const VIEWPORT = { width: 430, height: 1500 };
 
+/**
+ * One canvas for all four, because they sit side by side in a README table and a
+ * set of mismatched heights reads as carelessness.
+ *
+ * A real phone viewport rather than the full scroll height. The board is read on
+ * a phone, and a picture the shape of a phone says so at a glance; a 1400px
+ * ribbon of every card at once does not. Content running past the fold is not a
+ * defect here, it is what the screen actually looks like.
+ */
+const CANVAS_HEIGHT = 932;
+
 const browser = await chromium.launch();
 const context = await browser.newContext({
   viewport: VIEWPORT,
@@ -51,19 +62,9 @@ for (const league of ["nfl", "cfb"]) {
   // The "updated Ns ago" label ticks every second; let it settle on a round value.
   await page.waitForTimeout(1500);
 
-  // Trim to the content. scrollHeight is no use here because it never reports
-  // less than the viewport, so a short page measured as a tall one and nothing
-  // got trimmed. The real bottom is the lowest edge any element actually reaches.
-  const height = await page.evaluate(() => {
-    let bottom = 0;
-    for (const el of document.body.querySelectorAll("*")) {
-      const r = el.getBoundingClientRect();
-      if (r.height > 0 && r.bottom > bottom) bottom = r.bottom;
-    }
-    return Math.ceil(bottom + window.scrollY + 16);
-  });
-  await page.setViewportSize({ width: VIEWPORT.width, height: Math.min(height, 2400) });
+  await page.setViewportSize({ width: VIEWPORT.width, height: CANVAS_HEIGHT });
   await page.waitForTimeout(300);
+
 
   const file = path.join(docs, `${league}-${mode}.png`);
   await page.screenshot({ path: file, fullPage: false });

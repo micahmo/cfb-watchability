@@ -162,6 +162,101 @@ are all unvalidated against a real slate. Worth watching on a full Saturday: 41%
 cleared 55 with a single merely-decent game, which suggests the scale may be generous once
 forty games are live.
 
+## Why the score terms are shaped the way they are
+
+`prominence` deliberately takes the **better** of the two programs. One blue blood is enough to
+put a game in the national conversation, which is why a ranked team struggling against a MAC
+opponent is a bigger story than an excellent Sun Belt game. Broadcast slot feeds into it because
+networks allocate their best inventory to the games they expect to draw, so ABC and NBC rate far
+above ESPN+.
+
+Pregame `anticipation` inverts that and takes the **worse** of the two teams, because planning an
+evening around a mismatch is a bad idea however good the favourite is.
+
+`upset` uses the **pregame closing line**, not the ranking gap. Rank cannot tell a 27-point
+mismatch from a coin flip and both can look like "ranked versus unranked". A live line is no good
+either, because it moves with the game and prices the surprise away. The rank gap survives at 60%
+strength as a fallback, so an unranked team beating a ranked one still registers.
+
+The NFL has no AP rankings and no conference tiers worth speaking of, so prominence there is
+rebuilt from the standings feed: record quality, playoff seeding, kickoff slot. Slot carries real
+weight because every NFL network is a major one, so a Sunday night game is a deliberate statement
+about the matchup in a way that "it is on ESPN" is not in college.
+
+The conference-favourite bonus is graded rather than binary: both teams, then one, then neither.
+It shipped binary, which tied the first two tiers together and made a cross-conference game rank
+level with an all-AFC one.
+
+### The pace calibration bug
+
+`pace` was calibrated for college totals and applied to both leagues. NFL over/unders run around
+46 against college's 53, so an NFL game could never exceed 0.38 on that term. It flattened the
+whole NFL board, and the top game never crossed the `TURN THIS ON` threshold at 75. Fixing it
+moved the NFL top from 69.6 to 75.2. Worth remembering that a shared scale is a per-league
+assumption in disguise.
+
+### Three weight profiles, removed
+
+An earlier version shipped selectable profiles trading closeness against prominence. Measured
+against a full Saturday of finished games, the top-ranked game was **identical under all three**,
+nothing moved more than two positions, and what movement there was landed at positions nine
+through twelve. It never applied to the upcoming list at all. A control that cannot change the
+answer is not a control.
+
+### What the distribution looks like
+
+A typical week, which is why each tab has to be read against itself:
+
+```
+NFL  n=15   top 75.2   median 64.8   low 47.1
+CFB  n=60   top 87.8   median 45.4   low 38.4
+```
+
+College is bimodal: two genuinely great games, a cliff, then 46 of 60 below 55. The NFL is flat,
+with 12 of 15 between 55 and 75.
+
+## Working out which games a viewer can actually watch
+
+ESPN is a dead end here and it took four sources to establish it. The scoreboard labels every NFL
+game `National`, including the eight that are plainly regional. The `core` API carries real
+station call signs, but only for preseason games. 506sports' coverage maps sit behind a bot wall,
+and Gracenote's own commercial API needs a paid key. TitanTV works but is keyed to an account
+GUID, which means asking every viewer to register and dig one out of devtools.
+
+What does work is the public tvlistings grid, keyed on nothing but a postal code. It reports what
+each local affiliate is airing hour by hour, so a 1:00 slate that looks identical on the
+scoreboard comes back as "WBZ is showing Bills at Texans" in Boston and "WFRV is showing Bears at
+Panthers" in Green Bay. It refuses non-browser user agents with a flat 403, so the request sends a
+browser one; results are cached six hours per market with a cooldown after failures, which puts a
+market at a handful of requests a week.
+
+**Without a postal code nothing is flagged.** Regionality can be inferred from the slate alone,
+since a network airing several games in one kickoff window is by definition splitting them by
+market. But that fires on four-fifths of a Sunday board, and a badge on four-fifths of the rows is
+wallpaper rather than a signal. Marking the other fifth "national" is no better, because the chip
+already says NBC or ESPN and those *are* the national windows. So the board says it once, as a dot
+on the market control, and otherwise stays out of the way. College is excluded from the inference
+entirely: fifteen concurrent games under "ESPN+" are fifteen separate streams, not a market split,
+and the same count would lie.
+
+**A postal code alone is not always one market.** The grid's default is the over-the-air list,
+which near a boundary sweeps in every transmitter the area could receive: Fitchburg MA returns
+Boston, Providence, Manchester and Springfield affiliates together, and a viewer receives one
+market's worth of those. The first fix only narrowed when the lists visibly disagreed, three or
+more matchups in one window. That was too weak, because whether neighbouring markets happen to
+show the same games in a given week is luck. It now always narrows through a satellite lineup,
+which is scoped to the television market the postal code sits in and is the best available answer
+to "which market is this really".
+
+Nobody is asked to name their provider. The listings source has no streaming lineups at all, no
+YouTube TV, Hulu Live or Fubo, only over-the-air, cable and satellite. That turns out not to
+matter: every provider in a market carries the same local affiliates, and it is the affiliate that
+decides which regional game you get.
+
+**Call signs need care when normalising.** Stripping transmission-class suffixes blindly turns
+WFLD, FOX Chicago, into "WF", and WWLP into "WW". A trim only stands if what it leaves behind is
+itself a valid call sign: K or W plus two or three letters.
+
 ## Regenerating the screenshots
 
 The README shows four panels: live and upcoming, for each league. Only the upcoming pair can be

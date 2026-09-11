@@ -27,195 +27,87 @@ fabricated, because a live board only exists while games are being played. See
 situation, who has the ball, the network, the pregame line, and any tags that apply:
 `GAME ON THE LINE`, `UPSET ALERT`, `RECENT SWINGS`, `INSTANT CLASSIC`, `OVERTIME`.
 
-**Worth planning around**, grouped by day with days in chronological order and games ranked
-within each day, so you plan Friday before you plan Saturday. Each row shows kickoff time, the
-line, the over/under and the network.
+**Worth planning around**, grouped by day, days in order, games ranked within each day, so an
+earlier day's games are never buried under a better game later in the week. Each row shows
+kickoff time, the line, the over/under and the network.
 
-**Just finished**, the recent recap, best first.
+**Just finished**, the recent recap, best first. Games stay for eighteen hours, so last night is
+still there over breakfast.
 
-**League tabs** switch between NFL and college. The NFL opens by default. Your tab, favourite
-conferences and postal code all persist in the browser.
-
-**Favourite conferences** push the games you care about up the board. Tick AFC, or the SEC, and
-matchups involving those get a bonus applied client side, so it reorders instantly.
+**League tabs** switch between NFL and college; the NFL opens by default. **Favourite
+conferences** push the games you care about up the board, weighted higher when both teams
+qualify than one. Tab, favourites and market all persist in the browser.
 
 ## How the score works
 
-Every live game gets a 0-100 score, and the board sorts on it.
+Every live game gets a 0-100 score and the board sorts on it.
 
-**The main term is how close the game is, weighted by how late it is.** A tie in
-the first quarter is not the same event as a tie with ninety seconds left, so
-closeness is multiplied by `0.2 + 0.8 * progress²`. Closeness itself comes from
-ESPN's live win probability, falling back to a margin curve when ESPN stops
-publishing one.
+**The main term is how close the game is, weighted by how late it is**, since a tie in the first
+quarter is not the event a tie with ninety seconds left is. Closeness comes from ESPN's live win
+probability, falling back to a margin curve when ESPN stops publishing one.
 
-**A second term catches what win probability misses.** A team down five with the
-ball and thirty seconds left has a terrible win probability and is the most
-watchable thing on television. So one-score games inside the final five minutes
-get a `clutch` score, weighted up when the *trailing* team has the ball. The
-dominant term is whichever of the two is higher, so a game qualifies on either.
+**A second term catches what win probability misses.** A team down five with the ball and thirty
+seconds left has a terrible win probability and is the most watchable thing on television, so
+one-score games inside the final five minutes get a `clutch` score. The dominant term is
+whichever of the two is higher.
 
-Four smaller components adjust it:
+Five smaller components adjust it, with fixed weights:
 
-| Component | What it measures |
-| --- | --- |
-| `prominence` | How much of the country cares. Conference tier, best rank, and broadcast slot |
-| `upset` | How far the underdog is running ahead of the pregame closing line |
-| `swing` | Cumulative win-probability movement over the last fifteen minutes |
-| `stakes` | Both teams ranked, both top-10, conference game |
-| `pace` | Projected total points, so a 45-38 track meet beats a 10-7 slog |
+| Component | What it measures | Weight |
+| --- | --- | --- |
+| `primary` | Closeness, weighted by how late | 0.58 |
+| `prominence` | How much of the country cares | 0.18 |
+| `swing` | Win-probability movement over the last fifteen minutes | 0.08 |
+| `upset` | How far the underdog is running ahead of the closing line | 0.07 |
+| `stakes` | What the game decides | 0.05 |
+| `pace` | Projected total points, so a 45-38 beats a 10-7 | 0.04 |
 
-`prominence` deliberately takes the **better** of the two programs. One blue blood
-is enough to put a game in the national conversation, which is why a ranked team
-struggling against a MAC opponent is a bigger story than an excellent Sun Belt
-game. Broadcast slot feeds into it because networks allocate their best inventory
-to the games they expect to draw, so ABC and NBC rate far above ESPN+.
-
-### Where the two leagues differ
-
-The components are the same; what feeds them is not.
+The components are the same for both leagues; what feeds them is not.
 
 | Component | College | NFL |
 | --- | --- | --- |
 | `prominence` | Conference tier, best AP rank, broadcast slot | Best record, best playoff seed, kickoff slot |
-| `upset` | Closing line, with the rank gap as fallback | Closing line, with the record gap as fallback |
+| `upset` | Closing line, rank gap as fallback | Closing line, record gap as fallback |
 | `stakes` | Both ranked, both top-10, conference game | Division game, both contenders, both winning |
-| `pace` | Scaled around a 55-point typical total | Scaled around a 45-point typical total |
+| `pace` | Scaled around a 55-point total | Scaled around a 45-point total |
 
-There are no AP rankings in the NFL and no conference tiers worth speaking of, so prominence is
-rebuilt from the standings feed: record quality, playoff seeding, and the kickoff slot. Slot
-carries real weight there because every NFL network is a major one, so a Sunday night game is a
-deliberate statement about the matchup in a way that "it is on ESPN" is not in college.
+Upcoming games get a separate `anticipation` rating driven mostly by the spread, since nothing
+here beats the market at predicting a close game.
 
-`pace` is calibrated per league for a reason worth recording. Scaled for college, an NFL game
-could never exceed 0.38 on that term, because NFL over/unders run roughly 46 against college's
-53. That flattened the whole NFL board and kept it from ever crossing the `TURN THIS ON`
-threshold until it was fixed.
+Why each term is shaped the way it is, and the games that forced those decisions, are in
+[docs/design-notes.md](docs/design-notes.md).
 
-`upset` uses the **pregame closing line**, not the ranking gap. Rank cannot tell a
-27-point mismatch from a coin flip, and both can look like "ranked versus
-unranked". A live line is no good either, because it moves with the game and prices
-the surprise away. The ranking gap survives at 60% strength as a fallback, so an
-unranked team beating a ranked one still registers.
-
-### One weighting, not a dial
-
-An earlier version shipped three selectable profiles, trading closeness against
-prominence. Measured against a full Saturday of finished games, the top-ranked game
-was **identical under all three**, nothing moved more than two positions, and what
-movement there was happened at positions nine through twelve. It also never applied
-to the upcoming list at all. A control that cannot change the answer is not a
-control, so the weights are now fixed and tuned directly:
-
-| Component | Weight |
-| --- | --- |
-| `primary` (closeness, weighted by how late) | 0.58 |
-| `prominence` | 0.18 |
-| `swing` | 0.08 |
-| `upset` | 0.07 |
-| `stakes` | 0.05 |
-| `pace` | 0.04 |
-
-They sum to 1, so a total is always 0-100. A game with a 25-point margin past the
-80% mark is capped at 8 regardless of what the other terms think.
-
-### Before kickoff
-
-Upcoming games get a separate `anticipation` rating driven mostly by the spread,
-since nothing we compute beats the market at predicting a close game. Note the
-asymmetry with the live score: pregame quality takes the **worse** of the two
-teams, because planning an evening around a mismatch is a bad idea however good the
-favourite is.
-
-### What a number actually means
-
-The two leagues have different shapes, so read each tab against itself. A typical week:
-
-```
-NFL  n=15   top 75.2   median 64.8   low 47.1
-CFB  n=60   top 87.8   median 45.4   low 38.4
-```
-
-College is bimodal: two genuinely great games, a cliff, then 46 of 60 below 55. The NFL is flat,
-with 12 of 15 packed between 55 and 75. A 30-team league with a salary cap produces uniformly
-competitive matchups; a 130-team league produces a few marquee games and a lot of filler.
+### What a number means
 
 | Pregame | Reads as |
 | --- | --- |
 | 80+ | Rare. Two good teams, tight line, big slot |
-| 70-79 | Clear the evening. The top of a typical NFL slate |
-| 55-69 | Worth having on. Where most NFL games live |
+| 70-79 | Clear the evening |
+| 55-69 | Worth having on |
 | under 55 | Background noise |
 
-Pregame `anticipation` and the live score are **different scales**. Anticipation is deliberately
-conservative and takes the *worse* of the two teams. Live scores run higher because
-closeness-and-lateness dominates, which is why `TURN THIS ON` fires at 75 live. A 70 pregame can
-become a 90 once it kicks off.
+Read each tab against itself: a 30-team league with a salary cap produces a flat, uniformly
+competitive slate, a 130-team one produces a few marquee games and a lot of filler. Pregame
+`anticipation` and the live score are also different scales, and a 70 pregame can become a 90
+once it kicks off, which is why `TURN THIS ON` fires at 75 live.
 
 ## Can I actually watch it
 
 A great game you cannot get is not a recommendation. On Sunday afternoons the networks split the
-slate by market: eight games kick at 1:00, but only one CBS and one FOX game reaches any given
-city.
+slate by market: eight games kick at 1:00, but only one CBS and one FOX game reaches any city.
 
-ESPN cannot answer this. It labels every NFL game `National`, including the eight that are
-plainly regional, and the published coverage maps sit behind a bot wall. So the board works it
-out in two layers.
+ESPN cannot answer this, so the board reads the public Gracenote listings grid for your postal
+code and reports which of them your own affiliates are carrying. Games your market is not showing
+keep their real score but fade back and sort below the ones you can get.
 
-**Without a postal code**, regionality is derived from the slate itself. A network can only air
-one game per window in any one market, so whenever CBS or FOX carries several games in the same
-kickoff window, those games are by definition being divided up. That fact is worth saying exactly
-once, as a single prompt to set a postal code, and it is not worth a badge on every row: with no
-market set, every 1:00 game is equally regional, which is noise rather than a signal. College is
-deliberately excluded from the inference: fifteen concurrent games under "ESPN+" are fifteen
-separate streams, not a market split, and the same count would lie.
+Behind Cloudflare you do not have to type a postal code: switch on the managed transform *Add
+visitor location headers* and the board uses `CF-Postal-Code` as the default market. The control
+has three states, since "work it out for me" and "do not filter at all" are different requests: a
+postal code you typed, the detected one, and explicitly off. **Clear** turns it off entirely and
+**Redetect** goes back to the network's answer.
 
-**With a postal code**, the board reads the public Gracenote listings grid and reports which
-game your own affiliates are carrying, as `on WBZ, WPRI` or `not on your channels`. Games your
-market is not showing keep their real score, because the score says how good the game is, but
-they fade back and sort below the ones you can get. An absence is not a warning, so it is drawn
-quietly rather than in a colour that competes with the scores.
-
-**Usually you do not have to type one.** Behind Cloudflare, switching on the managed transform
-*Add visitor location headers* makes every request carry `CF-Postal-Code`, and the board uses it
-as the default market. An explicitly entered postal code always wins, because IP geolocation
-reliably lands in the right metro but not always the right one of two neighbouring markets.
-
-Trusting that header is safe because it is per request: forging one only changes the listings in
-your own response, which you could do by typing a different postal code anyway.
-
-**A postal code alone is not always one market.** The listings grid's default is the
-over-the-air list, which near a boundary sweeps in every transmitter the area could receive:
-Fitchburg MA returns Boston, Providence, Manchester and Springfield affiliates together, and a
-viewer receives one market's worth of those.
-
-So the board always narrows to a single market rather than waiting for the lists to visibly
-disagree. Whether neighbouring markets happen to be showing the same games in a given week is
-luck, and relying on it would name channels the viewer cannot receive. Satellite lineups are
-scoped to the television market a postal code sits in, which makes them the best available answer
-to "which market is this really": Fitchburg resolves to DISH Boston and reports WBZ, WCVB, WFXT
-and WBTS, while Rensselaer IN resolves to DISH Chicago and correctly drops the Indianapolis
-game that its over-the-air list had swept in.
-
-Nobody is asked to name their provider, which matters because the listings source has no
-streaming lineups at all: no YouTube TV, Hulu Live or Fubo, only over-the-air, cable and
-satellite. That turns out not to matter, since every provider in a market carries the same local
-affiliates, and it is the affiliate that decides which regional game you get.
-
-The market control has three states, because "work it out for me" and "do not filter at all" are
-different requests: a postal code you typed, the detected one, and explicitly off. **Clear** turns
-it off entirely rather than falling back to detection, and **Redetect** goes back to the network's
-answer without making you retype anything.
-
-With no postal code from any source, nothing is flagged at all. Every 1:00 game is then
-equally uncertain, and a badge on four-fifths of the board is wallpaper rather than a signal, so
-the board says it once as a dot on the market control and otherwise stays out of the way.
-
-An explicit postal code lives in the browser, not on the server, so the same board serves someone
-in Boston and someone in Dallas correctly.
-
-Fuller reasoning, and the games that forced each of these decisions, are in
-[docs/design-notes.md](docs/design-notes.md).
+With no postal code from any source, nothing is flagged and the board behaves as though the
+feature were not there.
 
 ## Running it
 
@@ -273,14 +165,14 @@ only offers to install from a secure context, which rules out plain-http LAN add
 | `DIST_DIR` | `../dist` | Built frontend location. Set in the container |
 | `POLL_MS` | `30000` | Poll interval while games are live |
 | `IDLE_POLL_MS` | `300000` | Poll interval when nothing is live |
-| `ESPN_GROUPS` | `80` | ESPN group id. `80` is FBS, `81` is FCS |
+| `ESPN_GROUPS` | `80` | ESPN group id, college only. `80` is FBS, `81` is FCS |
 | `ESPN_DATES` | current range | `YYYYMMDD` or a range. Pins the board to a past slate |
 | `SCHEDULE_DAYS` | `8` | How far ahead the planning list looks |
 | `SCHEDULE_POLL_MS` | `600000` | Schedule refresh interval |
 | `RECENT_WINDOW_HOURS` | `18` | How far back the recap reaches |
 | `ALLOWED_HOSTS` | - | Extra hostnames the dev server answers to, comma separated |
 
-Replaying a past Saturday is the easiest way to see a full board on a quiet weeknight:
+Replaying a past slate is the easiest way to see a full board on a quiet weeknight:
 
 ```bash
 ESPN_DATES=20260905 RECENT_WINDOW_HOURS=120 npm run dev:server
@@ -300,7 +192,7 @@ Both are read-only. Every other method returns 405.
 ```
 server/     per-league pollers, ESPN client, scoring model, prominence table,
             NFL standings, market listings, line and swing caches
-shared/     types and weight profiles used by both halves
+shared/     types and scoring weights used by both halves
 scripts/    replay tool for checking the model against finished games
 src/        Svelte 5 dashboard
 docs/       design notes
@@ -318,11 +210,8 @@ unraid/     container template
 - Where no closing line exists, mostly FCS matchups, upset detection falls back to the rank gap,
   which cannot tell a mismatch from a coin flip.
 - Swing history is in memory only, so a restart suppresses `RECENT SWINGS` until it refills.
-- **The listings grid refuses non-browser clients.** An honest tool name in the `User-Agent`
-  gets a flat 403, so the market lookup sends a browser one. It is the same public guide the
-  tvlistings site serves to any visitor, and results are cached for six hours per postal code
-  with a cooldown after failures, so a market costs a handful of requests a week.
-- Regional detection without a postal code infers the split from the slate. It can tell you a
-  game is market-split but not which way your market went.
+- **The listings grid refuses non-browser clients**, so the market lookup sends a browser
+  `User-Agent`. Results are cached six hours per market.
+- Without a postal code, nothing is flagged as unavailable at all.
 - NFL prominence leans on records and seeding, so it is near-flat in week one when everyone is
   0-0 and sharpens as the season goes.

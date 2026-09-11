@@ -34,6 +34,8 @@ const mode = process.argv.includes("--mode")
 
 /**
  * Fixed so a re-run produces the same pictures, rather than a new slate each time.
+ * Six games so the "also live" count reads as a real slate. Only the top of the
+ * board is in frame, but the count is not.
  * Records are invented too: the real slate is week one, where every team is 0-0,
  * and a board full of "0-0" photographs as broken rather than as representative.
  */
