@@ -85,15 +85,29 @@ export interface MarketListings {
   byMatchup: Map<string, GameAvailability>;
 }
 
+/** A complete US broadcast call sign: K or W, then two or three letters. */
+const CALL_SIGN = /^[KW][A-Z]{2,3}$/;
+
 /**
  * "WBZDT", "KIROLD5" and "WBTSCD" are all just "WBZ", "KIRO" and "WBTS" to a
  * viewer. The suffixes are transmission-class markers, not part of the name.
+ *
+ * Stripping them blindly is wrong, because plenty of real call signs end in those
+ * same two letters: WFLD is FOX Chicago, and a bare suffix rule turns it into
+ * "WF". So a trim only stands if what it leaves behind is itself a valid call
+ * sign, which "WF" is not.
  */
 function tidyCallSign(raw: string): string {
-  return String(raw ?? "")
-    .replace(/(DT|HD|LD|CD|LP|CA|TV)\d*$/i, "")
-    .replace(/\d+$/, "")
-    .trim();
+  const full = String(raw ?? "")
+    .trim()
+    .toUpperCase();
+  if (CALL_SIGN.test(full)) return full;
+  const trimmed = full.replace(/(DT|HD|LD|CD|LP|CA|TV)\d*$/, "").replace(/\d+$/, "");
+  if (CALL_SIGN.test(trimmed)) return trimmed;
+  // Cable networks are not call signs and never take the class suffixes above, so
+  // the guard rejects trimming them. They do carry HD and SD variants, and
+  // "ESPNHD" alongside "ESPN" is one channel listed twice.
+  return full.replace(/(HD|SD)$/, "") || full;
 }
 
 function matchupKey(away: string, home: string): string {
