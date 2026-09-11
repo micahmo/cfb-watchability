@@ -26,9 +26,30 @@ const SCHEDULE_POLL_MS = Number(process.env.SCHEDULE_POLL_MS ?? 10 * 60 * 1000);
 const SCHEDULE_RETRY_MS = 30_000;
 /** How many days ahead the planning list looks. */
 const SCHEDULE_DAYS = Number(process.env.SCHEDULE_DAYS ?? 8);
-/** Generous cap: the client groups these by day, so slicing by score alone here
- *  would silently drop a whole day off the planning list. */
-const MAX_UPCOMING = 60;
+/**
+ * Per day, not per slate.
+ *
+ * A single global cap sorted by anticipation quietly guts the near term. Over an
+ * eight-day college window ESPN returns around 157 upcoming games, and a cap of 60
+ * across all of them is decided by next Saturday's conference play, which outranks
+ * this Saturday's non-conference schedule. Measured on a live board: tomorrow got 17
+ * of its 71 games while next Saturday got 39, so three games kicked off today that
+ * had never appeared in the planning list at all.
+ *
+ * Capping within each day keeps every day's own best games. Sized above the biggest
+ * real Saturday on purpose, so in normal weeks it never binds and nothing is lost:
+ * it is a bound on a pathological response, not a ranking decision. The day boundary
+ * is the server's local one, which matches the viewer's grouping whenever they share
+ * a timezone; where they do not, a game near midnight lands in the neighbouring day's
+ * budget, which at this size trims nothing.
+ */
+const MAX_UPCOMING_PER_DAY = 100;
+/**
+ * The client renders three days. Shipping four covers it with a day of slack while
+ * keeping the payload honest: the old eight-day list spent most of its budget on
+ * days the client discarded without drawing them.
+ */
+const MAX_UPCOMING_DAYS = 4;
 const MAX_RECENT = 12;
 /** Cap the one-off line lookups per poll so a full Saturday cannot burst. */
 const MAX_LINE_LOOKUPS_PER_POLL = 4;
@@ -49,6 +70,34 @@ function liveDateRange(): string {
   const now = new Date();
   const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
   return `${yyyymmdd(yesterday)}-${yyyymmdd(now)}`;
+}
+
+/** Local calendar day, matching how the client groups the planning list. */
+function localDay(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "unknown";
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/**
+ * Keeps the best games of each of the next few days, rather than the best games
+ * overall. Input must already be sorted by anticipation; output stays in that
+ * order, since the client re-groups and re-sorts it anyway.
+ */
+function capPerDay(games: Game[]): Game[] {
+  const days = [...new Set(games.map((g) => localDay(g.startDate)))]
+    .sort()
+    .slice(0, MAX_UPCOMING_DAYS);
+  const budget = new Map(days.map((d) => [d, MAX_UPCOMING_PER_DAY]));
+  const kept: Game[] = [];
+  for (const game of games) {
+    const day = localDay(game.startDate);
+    const left = budget.get(day);
+    if (left === undefined || left === 0) continue;
+    budget.set(day, left - 1);
+    kept.push(game);
+  }
+  return kept;
 }
 
 /** Hook for league-specific data the scoreboard does not carry, such as NFL divisions. */
@@ -271,11 +320,12 @@ export class LeaguePoller {
       const upcomingSource =
         this.scheduled.length > 0 ? this.scheduled : games.filter((g) => g.state === "pre");
       const seen = new Set([...live, ...games.filter((g) => g.state === "post")].map((g) => g.id));
-      const upcoming = upcomingSource
-        .filter((g) => !seen.has(g.id))
-        .map((g) => this.withAnticipation(g))
-        .sort((a, b) => (b.anticipation ?? 0) - (a.anticipation ?? 0))
-        .slice(0, MAX_UPCOMING);
+      const upcoming = capPerDay(
+        upcomingSource
+          .filter((g) => !seen.has(g.id))
+          .map((g) => this.withAnticipation(g))
+          .sort((a, b) => (b.anticipation ?? 0) - (a.anticipation ?? 0)),
+      );
 
       const recent = games
         .filter((g) => g.state === "post" && now - Date.parse(g.startDate) < RECENT_WINDOW_MS)

@@ -122,9 +122,27 @@ games they expect to draw, so ABC and NBC rate far above ESPN+.
 
 The list is grouped by day, days in chronological order, ranked within each day. You plan Friday
 before you plan Saturday, so a better Saturday game must never outrank an earlier day's.
-Grouping happens on the client so day boundaries land in the viewer's timezone. The server
-therefore returns a generous slice: slicing by score alone would let a busy Saturday push an
-entire earlier day off the list.
+Grouping happens on the client so day boundaries land in the viewer's timezone.
+
+### The cap has to be per day, not per slate
+
+A single cap over the whole window, filled by anticipation, quietly guts the near term, and the
+failure is invisible because what is missing was never drawn. Over an eight-day college window
+ESPN returns around 157 upcoming games. Ranking all of them together and keeping 60 let next
+Saturday decide this Saturday's list: week 4 conference play outranks week 3's non-conference
+schedule, so a live board showed 39 games for next Saturday and 17 of tomorrow's 80. Three games
+kicked off that had never appeared in the planning list at all, and the symptom reported was "I
+have seen two games for today all week".
+
+Capping within each day fixes it, and the number is deliberately set above the biggest real
+Saturday so that in a normal week it never binds and nothing is dropped: it bounds a pathological
+response rather than making a ranking decision. Only the next few days are shipped at all, since
+the client renders three and the old list spent most of its budget on days it discarded without
+drawing.
+
+The day boundary used for the cap is the server's, and the one used for grouping is the viewer's.
+They agree whenever the two share a timezone; where they do not, a game near midnight counts
+against the neighbouring day's budget, which at this size trims nothing.
 
 ## Verifying the model against real games
 

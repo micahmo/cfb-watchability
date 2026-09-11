@@ -28,8 +28,8 @@ No API key, no account, no database.
 situation, who has the ball, the network, the pregame line, and any tags that apply:
 `GAME ON THE LINE`, `UPSET ALERT`, `RECENT SWINGS`, `INSTANT CLASSIC`, `OVERTIME`.
 
-**Worth planning around**, grouped by day, days in order, so an earlier day's games are never
-buried under a better game later in the week. Within a day, **Best** ranks by rating and **Time**
+**Worth planning around**, the next few days grouped by day, days in order, so an earlier day's
+games are never buried under a better game later in the week. Every game on a day is listed. Within a day, **Best** ranks by rating and **Time**
 runs chronologically, for reading the day in order and seeing which slots are worth it. Each row
 shows kickoff time, the line, the over/under and the network.
 
@@ -185,7 +185,7 @@ only offers to install from a secure context, which rules out plain-http LAN add
 | `IDLE_POLL_MS` | `300000` | Poll interval when nothing is live |
 | `ESPN_GROUPS` | `80` | ESPN group id, college only. `80` is FBS, `81` is FCS |
 | `ESPN_DATES` | current range | `YYYYMMDD` or a range. Pins the board to a past slate |
-| `SCHEDULE_DAYS` | `8` | How far ahead the planning list looks |
+| `SCHEDULE_DAYS` | `8` | How far ahead the schedule is fetched |
 | `SCHEDULE_POLL_MS` | `600000` | Schedule refresh interval |
 | `RECENT_WINDOW_HOURS` | `18` | How far back the recap reaches |
 | `ALLOWED_HOSTS` | - | Extra hostnames the dev server answers to, comma separated |
