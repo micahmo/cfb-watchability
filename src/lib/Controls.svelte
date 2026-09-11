@@ -37,7 +37,6 @@
     flex-wrap: wrap;
     align-items: center;
     gap: 10px;
-    margin: 10px 0 0;
   }
   .segmented {
     display: inline-flex;

@@ -42,7 +42,9 @@
     font: inherit;
     font-size: 12px;
     font-weight: 600;
-    padding: 6px 10px;
+    /* Matches the height of the segmented control beside it. */
+    height: 32px;
+    padding: 0 11px;
     cursor: pointer;
     display: inline-flex;
     align-items: center;

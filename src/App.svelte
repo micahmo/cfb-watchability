@@ -15,6 +15,9 @@
   const MAX_DAYS = 3;
   const MAX_PER_DAY = 6;
 
+  /** Day keys the user has expanded past MAX_PER_DAY. */
+  let expanded = $state<Record<string, boolean>>({});
+
   let snapshot = $state<Snapshot | null>(null);
   let loadError = $state<string | null>(null);
   let loading = $state(true);
@@ -120,14 +123,19 @@
     return [...groups.entries()]
       .sort(([a], [b]) => a.localeCompare(b))
       .slice(0, MAX_DAYS)
-      .map(([key, games]) => ({
-        key,
-        label: dayLabel(games[0].startDate),
-        date: dayDate(games[0].startDate),
-        games: [...games]
-          .sort((a, b) => anticipationOf(b) - anticipationOf(a))
-          .slice(0, MAX_PER_DAY),
-      }));
+      .map(([key, games]) => {
+        const ranked = [...games].sort((a, b) => anticipationOf(b) - anticipationOf(a));
+        const showAll = expanded[key] === true;
+        return {
+          key,
+          label: dayLabel(games[0].startDate),
+          date: dayDate(games[0].startDate),
+          total: ranked.length,
+          hidden: Math.max(0, ranked.length - MAX_PER_DAY),
+          showAll,
+          games: showAll ? ranked : ranked.slice(0, MAX_PER_DAY),
+        };
+      });
   });
 
   const updatedLabel = $derived.by(() => {
@@ -204,6 +212,15 @@
             {#each day.games as game (game.id)}
               <UpcomingRow {game} score={anticipationOf(game)} />
             {/each}
+            {#if day.hidden > 0 || day.showAll}
+              <button
+                type="button"
+                class="show-all"
+                onclick={() => (expanded[day.key] = !day.showAll)}
+              >
+                {day.showAll ? "Show fewer" : `Show all ${day.total}`}
+              </button>
+            {/if}
           </div>
         </div>
       {/each}
@@ -237,6 +254,7 @@
     flex-wrap: wrap;
     align-items: center;
     gap: 8px;
+    margin-top: 10px;
   }
   .status {
     display: flex;
@@ -305,6 +323,24 @@
   }
   .panel.tight {
     padding: 4px 14px;
+  }
+  .show-all {
+    display: block;
+    width: 100%;
+    background: none;
+    border: none;
+    border-top: 1px solid var(--border);
+    color: var(--text-dim);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 9px 0;
+    cursor: pointer;
+  }
+  @media (hover: hover) {
+    .show-all:hover {
+      color: var(--text);
+    }
   }
   .day-group + .day-group {
     margin-top: 14px;
