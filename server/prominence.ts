@@ -25,6 +25,26 @@ const CONFERENCE_TIER: Record<string, number> = {
 /** Everything else on the board is FCS. */
 const FCS_TIER = 0.1;
 
+/** Display names for the conferences worth offering as a preference. */
+const CONFERENCE_NAME: Record<string, string> = {
+  "8": "SEC",
+  "5": "Big Ten",
+  "4": "Big 12",
+  "1": "ACC",
+  "18": "Independents",
+  "151": "American",
+  "17": "Mountain West",
+  "9": "Pac-12",
+  "15": "MAC",
+  "37": "Sun Belt",
+  "12": "Conference USA",
+};
+
+export function conferenceName(conferenceId: string | null): string | null {
+  if (!conferenceId) return null;
+  return CONFERENCE_NAME[conferenceId] ?? null;
+}
+
 /**
  * Networks allocate their best inventory to the games they expect to draw, so the
  * broadcast slot is a strong, free proxy for how big a game is.

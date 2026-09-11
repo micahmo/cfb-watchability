@@ -103,9 +103,11 @@
 </script>
 
 <header>
-  <LeagueTabs />
-  <div class="title-row">
-    <h1>What should I be watching</h1>
+  <!-- One compact bar. The title and strapline used to cost ~110px of a phone
+       screen to say something the user already knows, and an installed PWA
+       already shows the app name in the task switcher. -->
+  <div class="topbar">
+    <LeagueTabs />
     <div class="status">
       {#if loadError}
         <span class="err">offline</span>
@@ -114,16 +116,9 @@
       {:else}
         <span class="ok"></span>
       {/if}
-      <span class="mono updated">updated {updatedLabel}</span>
+      <span class="mono updated">{updatedLabel}</span>
     </div>
   </div>
-  <p class="sub">
-    Live {prefs.league === "nfl" ? "NFL" : "college"} football, ranked by how good the game is
-    <em>right now</em>.
-    {#if snapshot?.season}
-      <span class="week">{snapshot.season} · week {snapshot.week}</span>
-    {/if}
-  </p>
   <Controls />
 </header>
 
@@ -192,17 +187,13 @@
 
 <style>
   header {
-    margin-bottom: 26px;
+    margin-bottom: 16px;
   }
-  .title-row {
+  .topbar {
     display: flex;
-    align-items: baseline;
+    align-items: center;
     justify-content: space-between;
-    gap: 16px;
-    flex-wrap: wrap;
-  }
-  h1 {
-    font-size: 26px;
+    gap: 12px;
   }
   .status {
     display: flex;
@@ -220,16 +211,6 @@
   .err {
     color: var(--hot);
     font-weight: 600;
-  }
-  .sub {
-    margin: 8px 0 0;
-    max-width: 74ch;
-    color: var(--text-dim);
-    line-height: 1.55;
-  }
-  .week {
-    color: var(--text-faint);
-    white-space: nowrap;
   }
   .hero {
     margin-bottom: 28px;

@@ -27,7 +27,7 @@ const pollers: Record<League, LeaguePoller> = {
   nfl: new LeaguePoller("nfl", (games) => standings.enrich(games)),
 };
 
-const DEFAULT_LEAGUE: League = "cfb";
+const DEFAULT_LEAGUE: League = "nfl";
 
 function leagueFrom(url: string): League {
   const value = new URL(url, "http://localhost").searchParams.get("league");

@@ -1,5 +1,5 @@
 import type { Game, GameState, League, TeamSide } from "../shared/types.js";
-import { broadcastTier } from "./prominence.js";
+import { broadcastTier, conferenceName } from "./prominence.js";
 
 const SITE_API = "https://site.api.espn.com/apis/site/v2/sports/football";
 
@@ -75,6 +75,7 @@ function toSide(competitor: any): TeamSide {
     rank: toRank(competitor?.curatedRank?.current),
     record: overall?.summary ?? "",
     winPct: winPctFrom(overall?.summary),
+    conferenceName: conferenceName(team.conferenceId != null ? String(team.conferenceId) : null),
     divisionId: null,
     playoffSeed: null,
     homeAway: competitor?.homeAway === "home" ? "home" : "away",

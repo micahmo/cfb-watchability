@@ -2,7 +2,8 @@
   import type { League } from "../../shared/types";
   import { persist, prefs } from "./prefs.svelte";
 
-  const LABELS: Record<League, string> = { cfb: "College", nfl: "NFL" };
+  /* Order here is the tab order. */
+  const LABELS: Record<League, string> = { nfl: "NFL", cfb: "College" };
 
   function choose(league: League) {
     if (prefs.league === league) return;

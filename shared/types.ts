@@ -17,6 +17,8 @@ export interface TeamSide {
   conferenceId: string | null;
   /** Win percentage from the overall record, 0..1. Null before any games. */
   winPct: number | null;
+  /** Human conference name: "SEC", "Big Ten", "AFC". Null when unknown. */
+  conferenceName: string | null;
   /** NFL only, from the standings feed. */
   divisionId: string | null;
   playoffSeed: number | null;

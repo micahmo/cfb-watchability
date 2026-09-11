@@ -15,7 +15,6 @@
 </script>
 
 <div class="controls">
-  <span class="label">Rank by</span>
   <div class="segmented" role="radiogroup" aria-label="Ranking profile">
     {#each Object.keys(PROFILES) as name (name)}
       <button
@@ -38,13 +37,7 @@
     flex-wrap: wrap;
     align-items: center;
     gap: 10px;
-    margin: 18px 0 4px;
-  }
-  .label {
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 0.09em;
-    color: var(--text-faint);
+    margin: 10px 0 0;
   }
   .segmented {
     display: inline-flex;

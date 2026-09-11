@@ -8,7 +8,7 @@ export interface Prefs {
   league: League;
 }
 
-const DEFAULTS: Prefs = { profile: DEFAULT_PROFILE, league: "cfb" };
+const DEFAULTS: Prefs = { profile: DEFAULT_PROFILE, league: "nfl" };
 
 function load(): Prefs {
   try {
