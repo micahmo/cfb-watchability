@@ -22,8 +22,16 @@ const PROVIDERS =
 /** Listings are published days ahead and do not churn, so this can be long. */
 const TTL_MS = 6 * 60 * 60 * 1000;
 
-/** After a refusal, wait rather than retrying on every single page load. */
-const FAILURE_COOLDOWN_MS = 30 * 60 * 1000;
+/**
+ * After a refusal, wait rather than retrying on every single page load.
+ *
+ * Sixty seconds, not thirty minutes. The long version was sized for "stop
+ * hammering an endpoint that is refusing us", but the upstream is usually fine
+ * and the failures are transient, so a single blip during a restart silently
+ * disabled the market for half an hour. One poll cycle of patience is enough to
+ * avoid hammering, and short enough that a blip is invisible.
+ */
+const FAILURE_COOLDOWN_MS = 60 * 1000;
 
 /**
  * The grid answers browsers and refuses everything else, so an honest tool name
@@ -246,6 +254,7 @@ export class ListingsStore {
     }
     if (!anySucceeded) {
       this.failedAt.set(key, Date.now());
+      console.error(`[listings] ${zip}: every window failed, backing off`);
       return null;
     }
     this.failedAt.delete(key);
@@ -303,6 +312,12 @@ export class ListingsStore {
 
     const failed = this.failedAt.get(key);
     if (failed !== undefined && Date.now() - failed < FAILURE_COOLDOWN_MS) {
+      // Say so. Returning null in silence made a self-inflicted outage look
+      // exactly like "the market feature does nothing", with no way to tell the
+      // difference from the logs.
+      console.log(
+        `[listings] ${zip}: holding off for ${Math.ceil((FAILURE_COOLDOWN_MS - (Date.now() - failed)) / 1000)}s after a failure`,
+      );
       return cached?.listings ?? null;
     }
 

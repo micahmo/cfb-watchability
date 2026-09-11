@@ -142,7 +142,7 @@ function detectedZip(req: http.IncomingMessage): string | null {
  * answering at all. It is cached, so giving up here costs nothing but a plain
  * board on the first request while the lookup finishes in the background.
  */
-const MARKET_BUDGET_MS = 3000;
+const MARKET_BUDGET_MS = 5000;
 
 async function withMarket(
   snapshot: Snapshot,
