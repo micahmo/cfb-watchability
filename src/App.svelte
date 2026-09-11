@@ -1,10 +1,11 @@
 <script lang="ts">
-  import type { Game, Snapshot } from "../shared/types";
+  import type { Game, League, Snapshot } from "../shared/types";
   import { PROFILES, combine } from "../shared/weights";
   import { fetchSnapshot } from "./lib/api";
   import { dayDate, dayKey, dayLabel, relativeTime, scoreColor } from "./lib/format";
   import { prefs } from "./lib/prefs.svelte";
   import Controls from "./lib/Controls.svelte";
+  import LeagueTabs from "./lib/LeagueTabs.svelte";
   import GameCard from "./lib/GameCard.svelte";
   import UpcomingRow from "./lib/UpcomingRow.svelte";
 
@@ -19,9 +20,12 @@
   // Ticks once a second purely so the "updated Ns ago" label stays honest.
   let now = $state(Date.now());
 
-  async function refresh() {
+  async function refresh(league: League) {
     try {
-      snapshot = await fetchSnapshot();
+      const next = await fetchSnapshot(league);
+      // Discard a response that arrived after the user switched tabs.
+      if (next.league !== prefs.league) return;
+      snapshot = next;
       loadError = null;
     } catch (err) {
       loadError = err instanceof Error ? err.message : String(err);
@@ -32,13 +36,17 @@
   }
 
   $effect(() => {
-    void refresh();
-    const poll = setInterval(refresh, REFRESH_MS);
+    const league = prefs.league;
+    snapshot = null;
+    loading = true;
+    void refresh(league);
+    const poll = setInterval(() => void refresh(league), REFRESH_MS);
+    return () => clearInterval(poll);
+  });
+
+  $effect(() => {
     const tick = setInterval(() => (now = Date.now()), 1000);
-    return () => {
-      clearInterval(poll);
-      clearInterval(tick);
-    };
+    return () => clearInterval(tick);
   });
 
   // The server ships every score component, so switching profiles is instant
@@ -95,6 +103,7 @@
 </script>
 
 <header>
+  <LeagueTabs />
   <div class="title-row">
     <h1>What should I be watching</h1>
     <div class="status">
@@ -109,7 +118,8 @@
     </div>
   </div>
   <p class="sub">
-    Live football, ranked by how good the game is <em>right now</em>.
+    Live {prefs.league === "nfl" ? "NFL" : "college"} football, ranked by how good the game is
+    <em>right now</em>.
     {#if snapshot?.season}
       <span class="week">{snapshot.season} · week {snapshot.week}</span>
     {/if}

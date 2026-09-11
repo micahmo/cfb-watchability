@@ -1,3 +1,5 @@
+export type League = "cfb" | "nfl";
+
 export type GameState = "pre" | "in" | "post";
 
 export interface TeamSide {
@@ -13,6 +15,11 @@ export interface TeamSide {
   record: string;
   homeAway: "home" | "away";
   conferenceId: string | null;
+  /** Win percentage from the overall record, 0..1. Null before any games. */
+  winPct: number | null;
+  /** NFL only, from the standings feed. */
+  divisionId: string | null;
+  playoffSeed: number | null;
 }
 
 /** Every component is 0..1. These are combined into a 0..100 total by `shared/weights`. */
@@ -42,6 +49,7 @@ export interface ScoreBreakdown extends ScoreComponents {
 
 export interface Game {
   id: string;
+  league: League;
   state: GameState;
   name: string;
   shortName: string;
@@ -69,6 +77,8 @@ export interface Game {
   downDistance: string | null;
   isRedZone: boolean;
   conferenceGame: boolean;
+  /** NFL: both teams in the same division. Meaningless for college. */
+  divisionGame: boolean;
   neutralSite: boolean;
   venue: string | null;
   odds: string | null;
@@ -89,6 +99,7 @@ export interface Game {
 }
 
 export interface Snapshot {
+  league: League;
   updatedAt: string;
   season: number | null;
   week: number | null;

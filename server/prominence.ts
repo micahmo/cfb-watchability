@@ -1,3 +1,5 @@
+import type { League } from "../shared/types.js";
+
 /**
  * How much of the country cares about this game, independent of whether it is close.
  *
@@ -58,15 +60,66 @@ function rankProminence(rank: number | null): number {
   return 0.5;
 }
 
+/**
+ * NFL kickoff slot, as a stand-in for the broadcast tier.
+ *
+ * Every NFL game is on a major network, so which network says almost nothing.
+ * What does say something is the window: a Sunday or Monday night game is the
+ * only football on, while a 1pm kickoff is one of eight. Hours are local, which
+ * is why the container needs TZ set to US Eastern.
+ */
+export function slotTier(startDate: string): number {
+  const d = new Date(startDate);
+  if (Number.isNaN(d.getTime())) return 0.5;
+  const hour = d.getHours();
+  if (hour >= 19) return 1.0; // Thursday, Sunday and Monday night
+  if (hour >= 16) return 0.7; // the late afternoon window, a handful of games
+  if (hour >= 11) return 0.5; // the early window, most of the slate
+  return 0.45; // international morning kickoffs
+}
+
+/** Seeding stands in for ranking: the NFL has standings rather than a poll. */
+function seedProminence(seed: number | null): number {
+  if (seed === null || seed <= 0) return 0.45; // preseason, or missing
+  if (seed <= 4) return 1.0; // division leaders
+  if (seed <= 7) return 0.75; // in the playoff field
+  if (seed <= 12) return 0.4;
+  return 0.2;
+}
+
+/** A neutral 0.5 before any games are played, rather than punishing week one. */
+function recordProminence(winPct: number | null): number {
+  if (winPct === null) return 0.5;
+  return clamp01(0.2 + 0.8 * winPct);
+}
+
+function clamp01(n: number): number {
+  return Math.min(1, Math.max(0, n));
+}
+
 export interface ProminenceInputs {
+  league: League;
   homeConferenceId: string | null;
   awayConferenceId: string | null;
   homeRank: number | null;
   awayRank: number | null;
+  homeWinPct: number | null;
+  awayWinPct: number | null;
+  homeSeed: number | null;
+  awaySeed: number | null;
   network: string | null;
+  startDate: string;
 }
 
 export function prominenceScore(i: ProminenceInputs): number {
+  if (i.league === "nfl") {
+    // No conference tiers to speak of: every NFL team is a major brand, so the
+    // differentiation has to come from how good the teams are and when it is on.
+    const quality = Math.max(recordProminence(i.homeWinPct), recordProminence(i.awayWinPct));
+    const seeding = Math.max(seedProminence(i.homeSeed), seedProminence(i.awaySeed));
+    return Math.min(1, 0.4 * quality + 0.3 * seeding + 0.3 * slotTier(i.startDate));
+  }
+
   const brand = Math.max(conferenceTier(i.homeConferenceId), conferenceTier(i.awayConferenceId));
   const rank = Math.max(rankProminence(i.homeRank), rankProminence(i.awayRank));
   const tv = broadcastTier(i.network);

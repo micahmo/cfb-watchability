@@ -1,12 +1,14 @@
 import { DEFAULT_PROFILE, type ProfileName } from "../../shared/weights";
+import type { League } from "../../shared/types";
 
 const KEY = "football-watchability-prefs";
 
 export interface Prefs {
   profile: ProfileName;
+  league: League;
 }
 
-const DEFAULTS: Prefs = { profile: DEFAULT_PROFILE };
+const DEFAULTS: Prefs = { profile: DEFAULT_PROFILE, league: "cfb" };
 
 function load(): Prefs {
   try {

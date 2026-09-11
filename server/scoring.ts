@@ -1,4 +1,4 @@
-import type { Game, ScoreBreakdown, ScoreComponents, TeamSide } from "../shared/types.js";
+import type { Game, League, ScoreBreakdown, ScoreComponents, TeamSide } from "../shared/types.js";
 import { DEFAULT_PROFILE, PROFILES, combine } from "../shared/weights.js";
 import { prominenceScore } from "./prominence.js";
 
@@ -108,6 +108,34 @@ function rankOf(team: TeamSide): number {
   return team.rank ?? UNRANKED;
 }
 
+/** A full .500 gap in win percentage is treated as a maximal mismatch. */
+const MAX_RECORD_GAP = 0.5;
+
+/**
+ * The NFL has no poll, so record stands in for the rank gap.
+ *
+ * The closing line already prices records in, so this is not a second prediction.
+ * It is the same narrative allowance the college model makes for rank: a winless
+ * team beating an unbeaten one is a story even when the spread was close.
+ */
+export function recordUpsetScore(home: TeamSide, away: TeamSide, progress: number): number {
+  if (home.winPct === null || away.winPct === null) return 0;
+  const [underdog, favorite] =
+    home.winPct < away.winPct ? [home, away] : [away, home];
+  const gap = Math.abs(home.winPct - away.winPct);
+  if (gap === 0) return 0;
+
+  const lead = underdog.score - favorite.score;
+  let position: number;
+  if (lead > 0) position = 1;
+  else if (lead === 0) position = 0.8;
+  else if (lead >= -8) position = 0.55;
+  else if (lead >= -16) position = 0.2;
+  else return 0;
+
+  return clamp((gap / MAX_RECORD_GAP) * (0.4 + 0.6 * progress) * position);
+}
+
 /** Rewards the lower-ranked team hanging with or beating the higher-ranked one. */
 export function upsetScore(home: TeamSide, away: TeamSide, progress: number): number {
   const hr = rankOf(home);
@@ -132,8 +160,35 @@ export function upsetScore(home: TeamSide, away: TeamSide, progress: number): nu
   return clamp(gapWeight * (0.4 + 0.6 * progress) * position);
 }
 
-/** Ranking and conference implications, which no clock-based metric can see. */
-export function stakesScore(home: TeamSide, away: TeamSide, conferenceGame: boolean): number {
+/** In the playoff field, as a seed. */
+function inPlayoffField(seed: number | null): boolean {
+  return seed !== null && seed > 0 && seed <= 7;
+}
+
+/**
+ * What the game means beyond itself. College has polls and conference play; the
+ * NFL has divisions and playoff seeding, which are the closer analogue of stakes
+ * than any record comparison would be.
+ */
+export function stakesScore(
+  league: League,
+  home: TeamSide,
+  away: TeamSide,
+  conferenceGame: boolean,
+  divisionGame: boolean,
+): number {
+  if (league === "nfl") {
+    let s = 0;
+    // Division games swing the tiebreakers that decide the division.
+    if (divisionGame) s += 0.45;
+    const contenders = [home, away].filter((t) => inPlayoffField(t.playoffSeed)).length;
+    if (contenders === 2) s += 0.4;
+    else if (contenders === 1) s += 0.15;
+    const winning = [home, away].filter((t) => (t.winPct ?? 0) > 0.5).length;
+    if (winning === 2) s += 0.15;
+    return clamp(s);
+  }
+
   const hr = rankOf(home);
   const ar = rankOf(away);
   let s = 0;
@@ -192,12 +247,15 @@ export function marketUpsetScore(
 }
 
 export interface ScoreInputs {
+  league: League;
   period: number;
   clockSeconds: number;
   home: TeamSide;
   away: TeamSide;
   homeWinProb: number | null;
   conferenceGame: boolean;
+  divisionGame: boolean;
+  startDate: string;
   swingMovement: number;
   possessionTeamId: string | null;
   network: string | null;
@@ -210,10 +268,15 @@ export interface ScoreInputs {
 }
 
 function combinedUpset(input: ScoreInputs, progress: number): number {
-  const rank = upsetScore(input.home, input.away, progress);
-  if (input.homeSpread === null) return rank; // No line, so rank is all we have.
+  // College ranks by poll, the NFL by record. Either way this is the narrative
+  // fallback, and the market drives the magnitude when a line exists.
+  const narrative =
+    input.league === "nfl"
+      ? recordUpsetScore(input.home, input.away, progress)
+      : upsetScore(input.home, input.away, progress);
+  if (input.homeSpread === null) return narrative;
   const market = marketUpsetScore(input.homeSpread, input.home, input.away, progress);
-  return Math.max(market, RANK_ONLY_CEILING * rank);
+  return Math.max(market, RANK_ONLY_CEILING * narrative);
 }
 
 export function scoreGame(input: ScoreInputs): ScoreBreakdown {
@@ -259,15 +322,21 @@ export function scoreGame(input: ScoreInputs): ScoreBreakdown {
     clutch,
     primary: Math.max(core, clutch),
     prominence: prominenceScore({
+      league: input.league,
       homeConferenceId: input.home.conferenceId,
       awayConferenceId: input.away.conferenceId,
       homeRank: input.home.rank,
       awayRank: input.away.rank,
+      homeWinPct: input.home.winPct,
+      awayWinPct: input.away.winPct,
+      homeSeed: input.home.playoffSeed,
+      awaySeed: input.away.playoffSeed,
       network: input.network,
+      startDate: input.startDate,
     }),
     swing: swingScore(input.swingMovement),
     upset: combinedUpset(input, progress),
-    stakes: stakesScore(input.home, input.away, input.conferenceGame),
+    stakes: stakesScore(input.league, input.home, input.away, input.conferenceGame, input.divisionGame),
     pace: paceScore(totalPoints, progress, input.overUnder),
   };
 
@@ -382,6 +451,12 @@ export function buildTags(game: Game, breakdown: ScoreBreakdown): string[] {
 
 // --- Pregame ---------------------------------------------------------------
 
+/** The NFL analogue of rank quality, before the season has separated anyone. */
+function recordQuality(winPct: number | null): number {
+  if (winPct === null) return 0.55; // neutral in week one
+  return clamp(0.15 + 0.85 * winPct);
+}
+
 /** Rank prominence reused for pregame quality, where both teams must be good. */
 function rankQuality(rank: number | null): number {
   if (rank === null) return 0.12;
@@ -400,12 +475,15 @@ export function spreadCloseness(spread: number | null): number {
 }
 
 export interface AnticipationInputs {
+  league: League;
   spread: number | null;
   overUnder: number | null;
   home: TeamSide;
   away: TeamSide;
   network: string | null;
   conferenceGame: boolean;
+  divisionGame: boolean;
+  startDate: string;
 }
 
 /**
@@ -418,16 +496,26 @@ export interface AnticipationInputs {
  */
 export function anticipationScore(i: AnticipationInputs): number {
   const closeness = spreadCloseness(i.spread);
-  const quality = Math.min(rankQuality(i.home.rank), rankQuality(i.away.rank));
+  // The worse of the two teams, so a mismatch is never worth planning around.
+  const quality =
+    i.league === "nfl"
+      ? Math.min(recordQuality(i.home.winPct), recordQuality(i.away.winPct))
+      : Math.min(rankQuality(i.home.rank), rankQuality(i.away.rank));
   const prominence = prominenceScore({
+    league: i.league,
     homeConferenceId: i.home.conferenceId,
     awayConferenceId: i.away.conferenceId,
     homeRank: i.home.rank,
     awayRank: i.away.rank,
+    homeWinPct: i.home.winPct,
+    awayWinPct: i.away.winPct,
+    homeSeed: i.home.playoffSeed,
+    awaySeed: i.away.playoffSeed,
     network: i.network,
+    startDate: i.startDate,
   });
   const pace = i.overUnder === null ? 0.3 : clamp((i.overUnder - 40) / 30);
-  const conference = i.conferenceGame ? 1 : 0;
+  const conference = i.league === "nfl" ? (i.divisionGame ? 1 : 0) : i.conferenceGame ? 1 : 0;
 
   const total =
     100 *

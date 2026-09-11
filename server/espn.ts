@@ -1,8 +1,13 @@
-import type { Game, GameState, TeamSide } from "../shared/types.js";
+import type { Game, GameState, League, TeamSide } from "../shared/types.js";
 import { broadcastTier } from "./prominence.js";
 
-const SCOREBOARD =
-  "https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard";
+const SITE_API = "https://site.api.espn.com/apis/site/v2/sports/football";
+
+/** ESPN's path segment per league. */
+const SPORT_PATH: Record<League, string> = {
+  cfb: "college-football",
+  nfl: "nfl",
+};
 
 /** Thrown on HTTP 429 so the poller can back off harder than for a generic failure. */
 export class RateLimitError extends Error {
@@ -15,8 +20,9 @@ export class RateLimitError extends Error {
   }
 }
 
-/** ESPN group 80 is FBS. 81 is FCS. */
 export interface FetchOptions {
+  league: League;
+  /** College only. ESPN group 80 is FBS, 81 is FCS. The NFL feed takes no groups. */
   groups?: string;
   limit?: number;
   /** YYYYMMDD, or a YYYYMMDD-YYYYMMDD range. Omit for the current week. */
@@ -41,6 +47,17 @@ function toRank(curated: unknown): number | null {
   return n;
 }
 
+/** "9-3" or "9-3-1" to a win percentage, counting a tie as half a win. */
+function winPctFrom(summary: unknown): number | null {
+  if (typeof summary !== "string") return null;
+  const parts = summary.split("-").map(Number);
+  if (parts.length < 2 || parts.some((n) => !Number.isFinite(n))) return null;
+  const [wins, losses, ties = 0] = parts;
+  const played = wins + losses + ties;
+  if (played === 0) return null;
+  return (wins + ties / 2) / played;
+}
+
 function toSide(competitor: any): TeamSide {
   const team = competitor?.team ?? {};
   const overall = (competitor?.records ?? []).find(
@@ -57,12 +74,15 @@ function toSide(competitor: any): TeamSide {
     score: Number(competitor?.score ?? 0) || 0,
     rank: toRank(competitor?.curatedRank?.current),
     record: overall?.summary ?? "",
+    winPct: winPctFrom(overall?.summary),
+    divisionId: null,
+    playoffSeed: null,
     homeAway: competitor?.homeAway === "home" ? "home" : "away",
     conferenceId: team.conferenceId != null ? String(team.conferenceId) : null,
   };
 }
 
-function normalize(event: any): RawGame | null {
+function normalize(event: any, league: League): RawGame | null {
   const comp = event?.competitions?.[0];
   if (!comp) return null;
 
@@ -102,6 +122,7 @@ function normalize(event: any): RawGame | null {
 
   return {
     id: String(event.id),
+    league,
     state,
     name: event.name ?? `${away.displayName} at ${home.displayName}`,
     shortName: event.shortName ?? `${away.abbrev} @ ${home.abbrev}`,
@@ -123,6 +144,8 @@ function normalize(event: any): RawGame | null {
     downDistance: comp?.situation?.downDistanceText ?? null,
     isRedZone: Boolean(comp?.situation?.isRedZone),
     conferenceGame: Boolean(comp.conferenceCompetition),
+    // Filled in later from the standings feed; the scoreboard does not carry it.
+    divisionGame: false,
     neutralSite: Boolean(comp.neutralSite),
     venue: comp?.venue?.fullName ?? null,
     odds: odds?.details ?? null,
@@ -133,14 +156,13 @@ function normalize(event: any): RawGame | null {
   };
 }
 
-export async function fetchScoreboard(opts: FetchOptions = {}): Promise<ScoreboardResult> {
-  const params = new URLSearchParams({
-    groups: opts.groups ?? "80",
-    limit: String(opts.limit ?? 200),
-  });
+export async function fetchScoreboard(opts: FetchOptions): Promise<ScoreboardResult> {
+  const params = new URLSearchParams({ limit: String(opts.limit ?? 200) });
+  // Sending groups to the NFL endpoint returns an empty slate.
+  if (opts.league === "cfb") params.set("groups", opts.groups ?? "80");
   if (opts.dates) params.set("dates", opts.dates);
 
-  const res = await fetch(`${SCOREBOARD}?${params}`, {
+  const res = await fetch(`${SITE_API}/${SPORT_PATH[opts.league]}/scoreboard?${params}`, {
     headers: {
       accept: "application/json",
       // Identify ourselves rather than showing up as an anonymous bot.
@@ -155,7 +177,7 @@ export async function fetchScoreboard(opts: FetchOptions = {}): Promise<Scoreboa
 
   const body: any = await res.json();
   const games = (body?.events ?? [])
-    .map(normalize)
+    .map((e: unknown) => normalize(e, opts.league))
     .filter((g: RawGame | null): g is RawGame => g !== null);
 
   return {
@@ -166,8 +188,7 @@ export async function fetchScoreboard(opts: FetchOptions = {}): Promise<Scoreboa
 }
 
 
-const SUMMARY =
-  "https://site.api.espn.com/apis/site/v2/sports/football/college-football/summary";
+
 
 /**
  * Fetches one game's pregame closing line from ESPN's summary endpoint.
@@ -177,9 +198,11 @@ const SUMMARY =
  * against 12 games: the spread is home-relative, negative meaning home favoured.
  */
 export async function fetchPregameLine(
+  league: League,
   eventId: string,
 ): Promise<{ homeSpread: number; overUnder: number | null; details: string | null } | null> {
-  const res = await fetch(`${SUMMARY}?event=${encodeURIComponent(eventId)}`, {
+  const url = `${SITE_API}/${SPORT_PATH[league]}/summary?event=${encodeURIComponent(eventId)}`;
+  const res = await fetch(url, {
     headers: {
       accept: "application/json",
       "user-agent": "football-watchability/0.1 (personal dashboard)",
