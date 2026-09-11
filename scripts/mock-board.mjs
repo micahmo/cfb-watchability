@@ -198,10 +198,18 @@ http
     const url = (req.url ?? "/").split("?")[0];
     if (url === "/api/snapshot") {
       const league = new URL(req.url, "http://x").searchParams.get("league") === "cfb" ? "cfb" : "nfl";
-      void snapshot(league).then((s) => {
-        res.writeHead(200, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
-        res.end(JSON.stringify(s));
-      });
+      // ESPN times out occasionally. Unhandled, that rejection kills the whole
+      // script mid-capture, which is a poor way to find out.
+      void snapshot(league)
+        .then((s) => {
+          res.writeHead(200, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
+          res.end(JSON.stringify(s));
+        })
+        .catch((err) => {
+          console.error(`[mock] ${league} failed: ${err instanceof Error ? err.message : err}`);
+          res.writeHead(503, { "content-type": "application/json" });
+          res.end(JSON.stringify({ error: "upstream failed, retry" }));
+        });
       return;
     }
     const candidate = path.resolve(distDir, "." + decodeURIComponent(url));
