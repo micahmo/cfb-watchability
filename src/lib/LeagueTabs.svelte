@@ -30,7 +30,7 @@
     display: flex;
     gap: 4px;
     /* No bottom margin: it inflated the top bar past the tabs' own height, which
-       left the status text centred 7px below the tab labels it sits beside. The
+       left the status text centered 7px below the tab labels it sits beside. The
        spacing below now comes from the controls row. */
   }
   .tabs button {

@@ -46,7 +46,7 @@ const KICKOFF_GRACE_MS = 5 * 60 * 1000;
 
 const DAILY_CAP = 3;
 const COOLDOWN_MS = 10 * 60 * 1000;
-const FAVOURITE_BONUS = [0, 8, 13];
+const FAVORITE_BONUS = [0, 8, 13];
 
 export interface Alert {
   category: Category;
@@ -60,18 +60,18 @@ function secondsLeft(game: Game): number {
   return (4 - Math.min(game.period, 4)) * 900 + game.clockSeconds;
 }
 
-function favouriteBoost(game: Game, favourites: string[]): number {
+function favoriteBoost(game: Game, favorites: string[]): number {
   const matches =
-    Number(favourites.includes(game.home.conferenceName ?? "")) +
-    Number(favourites.includes(game.away.conferenceName ?? ""));
-  return FAVOURITE_BONUS[matches];
+    Number(favorites.includes(game.home.conferenceName ?? "")) +
+    Number(favorites.includes(game.away.conferenceName ?? ""));
+  return FAVORITE_BONUS[matches];
 }
 
-/** The same number the viewer sees on their own board, favourites included. */
-function boosted(game: Game, favourites: string[]): number {
+/** The same number the viewer sees on their own board, favorites included. */
+function boosted(game: Game, favorites: string[]): number {
   if (!game.score) return 0;
   const base = combine(game.score, PROFILES[DEFAULT_PROFILE], game.score.maxTotal);
-  return Math.min(100, base + favouriteBoost(game, favourites));
+  return Math.min(100, base + favoriteBoost(game, favorites));
 }
 
 /** Their own market says this is not on, so there is nothing to switch to. */
@@ -119,12 +119,12 @@ export class AlertEngine {
     const wants = sub.wants[league] ?? [];
     if (wants.length === 0) return [];
 
-    const favourites = sub.favourites[league] ?? [];
+    const favorites = sub.favorites[league] ?? [];
     const live = snapshot.live.filter((g) => !unavailable(g));
     const out: Alert[] = [];
 
     for (const game of live) {
-      const score = boosted(game, favourites);
+      const score = boosted(game, favorites);
       const alternatives = live.length - 1;
       const already = (c: Category) => this.sent.has(`${sub.id}:${game.id}:${c}`);
 
@@ -171,7 +171,7 @@ export class AlertEngine {
       else slots.set(game.startDate, [game]);
     }
 
-    const favourites = sub.favourites[league] ?? [];
+    const favorites = sub.favorites[league] ?? [];
     const out: Alert[] = [];
     for (const [startDate, games] of slots) {
       const solo = games.length <= PRIMETIME_MAX_SLATE;
@@ -184,7 +184,7 @@ export class AlertEngine {
       const key = `${league}:${startDate}`;
       if (this.announced.has(key)) continue;
 
-      const rank = (g: Game) => (g.anticipation ?? 0) + favouriteBoost(g, favourites);
+      const rank = (g: Game) => (g.anticipation ?? 0) + favoriteBoost(g, favorites);
       const best = games.filter((g) => !unavailable(g)).sort((a, b) => rank(b) - rank(a))[0];
       if (!best) continue;
 

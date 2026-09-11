@@ -32,7 +32,7 @@
 
   /* Deliberately not a setting per category per league in one panel: that is
      eight checkboxes on a phone. The panel configures whichever league's tab you
-     are on, the same way favourites does. */
+     are on, the same way favorites does. */
   const LABELS: Record<Category, string> = {
     hero: "Turn this on",
     classic: "Instant classic",
@@ -89,7 +89,7 @@
           publicKey: config.publicKey,
           wants,
           zip: marketZip,
-          favourites: prefs.favourites,
+          favorites: prefs.favorites,
         });
         if (!ok) {
           // Permission refused, or the push service said no. Put the switch back

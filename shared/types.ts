@@ -101,7 +101,7 @@ export interface Game {
   neutralSite: boolean;
   venue: string | null;
   odds: string | null;
-  /** Absolute point spread. Sign is meaningless here; `odds` carries the favourite. */
+  /** Absolute point spread. Sign is meaningless here; `odds` carries the favorite. */
   spread: number | null;
   /** Signed spread relative to the home team. Negative means home was favoured. */
   homeSpread: number | null;

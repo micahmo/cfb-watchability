@@ -32,7 +32,7 @@
 <style>
   .toast {
     position: fixed;
-    /* Anchored to both edges and centred with auto margins rather than left: 50% and
+    /* Anchored to both edges and centered with auto margins rather than left: 50% and
        a transform. A fixed element sizes itself against the space from its offsets to
        the edge, so left: 50% leaves it half the viewport to fit in and the text wraps
        while the box still looks like it has room to spare. */

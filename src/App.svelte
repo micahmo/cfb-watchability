@@ -3,9 +3,9 @@
   import { DEFAULT_PROFILE, PROFILES, combine } from "../shared/weights";
   import { fetchSnapshot } from "./lib/api";
   import { dayDate, dayKey, dayLabel, relativeTime, scoreColor } from "./lib/format";
-  import { isFavourite, prefs, setUpcomingOrder } from "./lib/prefs.svelte";
+  import { isFavorite, prefs, setUpcomingOrder } from "./lib/prefs.svelte";
   import LeagueTabs from "./lib/LeagueTabs.svelte";
-  import FavouriteConferences from "./lib/FavouriteConferences.svelte";
+  import FavoriteConferences from "./lib/FavoriteConferences.svelte";
   import MarketPicker from "./lib/MarketPicker.svelte";
   import AlertsPicker from "./lib/AlertsPicker.svelte";
   import UpdatePrompt from "./lib/UpdatePrompt.svelte";
@@ -26,7 +26,7 @@
    * because they share a row: two panels open at once would overlap, and a panel
    * that is a flex sibling of its own button wedges the row apart when it opens.
    */
-  let openPanel = $state<"favourites" | "market" | "alerts" | null>(null);
+  let openPanel = $state<"favorites" | "market" | "alerts" | null>(null);
 
   /**
    * The last market the board resolved, kept across tab switches.
@@ -42,7 +42,7 @@
     if (zip) lastMarketZip = zip;
   });
 
-  function togglePanel(which: "favourites" | "market" | "alerts"): void {
+  function togglePanel(which: "favorites" | "market" | "alerts"): void {
     openPanel = openPanel === which ? null : which;
   }
 
@@ -95,17 +95,17 @@
    * than the first did: one team you care about is already most of the reason to
    * watch. So the order is both teams, then one, then neither.
    */
-  const FAVOURITE_BONUS = [0, 8, 13];
+  const FAVORITE_BONUS = [0, 8, 13];
 
-  function favouriteBoost(game: Game): number {
+  function favoriteBoost(game: Game): number {
     const matches =
-      Number(isFavourite(prefs.league, game.home.conferenceName)) +
-      Number(isFavourite(prefs.league, game.away.conferenceName));
-    return FAVOURITE_BONUS[matches];
+      Number(isFavorite(prefs.league, game.home.conferenceName)) +
+      Number(isFavorite(prefs.league, game.away.conferenceName));
+    return FAVORITE_BONUS[matches];
   }
 
   // The server ships every score component and the browser recombines them, so
-  // favourites reorder the board without a round trip.
+  // favorites reorder the board without a round trip.
   function scoreOf(game: Game): number {
     if (!game.score) return 0;
     // One fixed weighting. Three selectable profiles shipped for a while and
@@ -114,11 +114,11 @@
     // there was landed at positions nine through twelve. Tune these numbers
     // instead of asking the reader to.
     const base = combine(game.score, PROFILES[DEFAULT_PROFILE], game.score.maxTotal);
-    return Math.min(100, base + favouriteBoost(game));
+    return Math.min(100, base + favoriteBoost(game));
   }
 
   function anticipationOf(game: Game): number {
-    return Math.min(100, (game.anticipation ?? 0) + favouriteBoost(game));
+    return Math.min(100, (game.anticipation ?? 0) + favoriteBoost(game));
   }
 
   /**
@@ -251,11 +251,11 @@
     </div>
   </div>
   <div class="controls-row">
-    <FavouriteConferences
+    <FavoriteConferences
       {conferences}
       league={prefs.league}
-      open={openPanel === "favourites"}
-      ontoggle={() => togglePanel("favourites")}
+      open={openPanel === "favorites"}
+      ontoggle={() => togglePanel("favorites")}
     />
     {#if prefs.league === "nfl"}
       <MarketPicker
@@ -407,10 +407,10 @@
      about. Scoped under .panel to outrank ".panel p", which sets card body text
      to 13px and was silently winning against a bare .cutoff. */
   .panel .cutoff {
-    /* Centred as a flex row rather than by vertical-align. The marker is a
+    /* Centered as a flex row rather than by vertical-align. The marker is a
        replaced element aligned on the baseline, which left it four pixels above
-       the text's optical centre; these are uppercase with no descenders, so
-       centring on the line box lands within half a pixel of the ink. */
+       the text's optical center; these are uppercase with no descenders, so
+       centering on the line box lands within half a pixel of the ink. */
     display: flex;
     align-items: center;
     /* Bounded top and bottom, so it is an entry in the list rather than the top

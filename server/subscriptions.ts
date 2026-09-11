@@ -17,7 +17,7 @@ export interface Subscription {
   wants: Record<League, Category[]>;
   /** Mirrors the viewer's board settings, so alerts match what they would see. */
   zip: string | null;
-  favourites: Record<League, string[]>;
+  favorites: Record<League, string[]>;
   createdAt: string;
 }
 

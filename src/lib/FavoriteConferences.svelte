@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { League } from "../../shared/types";
-  import { isFavourite, prefs, toggleFavourite } from "./prefs.svelte";
+  import { isFavorite, prefs, toggleFavorite } from "./prefs.svelte";
 
   let {
     conferences,
@@ -14,12 +14,12 @@
     open?: boolean;
     ontoggle?: () => void;
   } = $props();
-  const chosen = $derived(prefs.favourites[league] ?? []);
+  const chosen = $derived(prefs.favorites[league] ?? []);
 </script>
 
 {#if conferences.length}
   <button type="button" class="dd-toggle" onclick={() => ontoggle?.()}>
-    {chosen.length ? `Favourites: ${chosen.join(", ")}` : "Favourites"}
+    {chosen.length ? `Favorites: ${chosen.join(", ")}` : "Favorites"}
     <span class="dd-caret" class:open>▾</span>
   </button>
 {/if}
@@ -29,11 +29,11 @@
     <p class="dd-hint">Games involving these get a boost up the board.</p>
     <div class="grid">
       {#each conferences as conference (conference)}
-        <label class="item" class:on={isFavourite(league, conference)}>
+        <label class="item" class:on={isFavorite(league, conference)}>
           <input
             type="checkbox"
-            checked={isFavourite(league, conference)}
-            onchange={() => toggleFavourite(league, conference)}
+            checked={isFavorite(league, conference)}
+            onchange={() => toggleFavorite(league, conference)}
           />
           {conference}
         </label>

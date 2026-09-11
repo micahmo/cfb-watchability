@@ -30,7 +30,7 @@
   const showPossession = $derived(variant === "live" && game.possessionTeamId !== null);
 
   /** Home-relative spread: negative means the home team was favoured. */
-  const favouriteSide = $derived(
+  const favoriteSide = $derived(
     game.pregameSpread === null || game.pregameSpread === 0
       ? null
       : game.pregameSpread < 0
@@ -71,7 +71,7 @@
           {#if team.rank}<span class="rank-badge mono">{team.rank}</span>{/if}
           <span class="team-name">{team.name}</span>
           <span class="record mono">{team.record}</span>
-          {#if favouriteSide === team.homeAway}
+          {#if favoriteSide === team.homeAway}
             <span class="spread mono" title="Pregame closing line, not a live line.">
               {spreadLabel}
             </span>
@@ -286,7 +286,7 @@
     border-color: rgba(255, 165, 61, 0.35);
   }
   /* An absence, not a warning. The row is already sorted down and faded; a
-     colour here would shout about the games you are least likely to want. */
+     color here would shout about the games you are least likely to want. */
   .card.unavailable {
     opacity: 0.55;
   }

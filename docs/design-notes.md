@@ -31,9 +31,9 @@ unavailable. The first version used the AP rank gap instead, treating unranked a
 
 That is too crude, and it produced a visible false positive on the first night it ran. SMU
 (#19) at Florida State (unranked) was tagged `UPSET ALERT` at 24-24 in the fourth. But the
-market had SMU as a **3-point favourite**, so a tie was the expected result. Rank gap cannot
+market had SMU as a **3-point favorite**, so a tie was the expected result. Rank gap cannot
 tell a 3-point coin flip from a mismatch, and it rated Michigan, who were **27.5-point
-favourites**, identically.
+favorites**, identically.
 
 The fix is the **pregame closing line**, and no second data provider is needed. ESPN keeps it
 in `pickcenter` on the summary endpoint, and it survives kickoff and the final whistle. Lines
@@ -115,7 +115,7 @@ Games that have not kicked off get a separate `anticipation` rating, driven most
 spread, because nothing we compute beats the market at predicting a close game.
 
 Note the asymmetry with the live score. Pregame `quality` takes the **worse** of the two teams,
-since planning an evening around a mismatch is a bad idea however good the favourite is.
+since planning an evening around a mismatch is a bad idea however good the favorite is.
 `prominence` takes the **better**, since one blue blood is enough to put a game in the national
 conversation. Broadcast slot feeds prominence too: networks allocate their best inventory to the
 games they expect to draw, so ABC and NBC rate far above ESPN+.
@@ -172,7 +172,7 @@ above ESPN+.
 
 Pregame `anticipation` is driven mostly by the spread, because nothing computed here beats the
 market at predicting a close game. It inverts prominence and takes the **worse** of the two
-teams, because planning an evening around a mismatch is a bad idea however good the favourite is.
+teams, because planning an evening around a mismatch is a bad idea however good the favorite is.
 A 45-38 college shootout and a 27-24 NFL game are not the same event, which is why the two
 leagues are calibrated separately rather than sharing one scale.
 
@@ -186,7 +186,7 @@ rebuilt from the standings feed: record quality, playoff seeding, kickoff slot. 
 weight because every NFL network is a major one, so a Sunday night game is a deliberate statement
 about the matchup in a way that "it is on ESPN" is not in college.
 
-The conference-favourite bonus is graded rather than binary: both teams, then one, then neither.
+The conference-favorite bonus is graded rather than binary: both teams, then one, then neither.
 It shipped binary, which tied the first two tiers together and made a cross-conference game rank
 level with an all-AFC one.
 
@@ -387,7 +387,7 @@ Q3  27-7    underdog at 93%  ->  tension 0.25    decided
 Q4  37-21   underdog at 100% ->  tension 0.00    over
 ```
 
-Note the first quarter: level at 7-7 against a 29.5-point favourite scores almost nothing, and
+Note the first quarter: level at 7-7 against a 29.5-point favorite scores almost nothing, and
 that is correct. Being tied early does not mean much when there are three quarters for the gap to
 reassert itself. The moment is the half.
 
@@ -480,7 +480,7 @@ live scores. It is undocumented, like every other endpoint this project uses, an
 Two details cost time. Node's built-in `WebSocket` fails the upgrade; a manual handshake over
 `https.request` succeeds, with or without an `Origin` header. And the path is right even when it
 returns 404 to a plain GET: `{"rc":404,"op":"ERROR"}` with a `Server: Fastcast/4.1.26` header is
-the service saying "that was not an upgrade request", whereas an unrecognised path returns an
+the service saying "that was not an upgrade request", whereas an unrecognized path returns an
 empty 404. That distinction is what located the correct path.
 
 Valid topic found: `scoreboard-football-nfl`. Per-event names of the shape `gp-football-nfl-<id>`
@@ -526,7 +526,7 @@ The README shows four panels: live and upcoming, for each league. Only the upcom
 photographed from the real board, because a live board only exists while games are being played,
 and waiting for a Sunday to document a UI change is not a workflow. The alternative, shipping
 stale images, is what actually happened: the original pair went three features out of date before
-anyone noticed, still showing a college-only app with no league tabs, favourites or market
+anyone noticed, still showing a college-only app with no league tabs, favorites or market
 control.
 
 So the live pair is fabricated, carefully. Teams, records, lines, networks and listings come from

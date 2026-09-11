@@ -70,15 +70,15 @@ export interface SubscribeInput {
   publicKey: string;
   wants: Record<League, Category[]>;
   zip: string | null;
-  favourites: Record<League, string[]>;
+  favorites: Record<League, string[]>;
 }
 
 /**
  * Subscribes this browser and registers the preferences with it.
  *
- * The server needs the postal code and favourites alongside the endpoint,
+ * The server needs the postal code and favorites alongside the endpoint,
  * because it evaluates alerts the way this viewer's own board would: a game
- * their market is not carrying is not worth a notification, and a favourite
+ * their market is not carrying is not worth a notification, and a favorite
  * conference quietly lowers the bar.
  */
 export async function subscribe(input: SubscribeInput): Promise<boolean> {
@@ -111,7 +111,7 @@ export async function subscribe(input: SubscribeInput): Promise<boolean> {
       keys: raw.keys,
       wants: input.wants,
       zip: input.zip,
-      favourites: input.favourites,
+      favorites: input.favorites,
     }),
   });
   return res.ok;

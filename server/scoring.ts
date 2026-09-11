@@ -317,7 +317,7 @@ export function upsetTensionScore(
   // main term already handles.
   if (spread < 6) return 0;
 
-  // Implied pregame win probability for the favourite. A logistic on the spread:
+  // Implied pregame win probability for the favorite. A logistic on the spread:
   // a field goal is a coin flip nudged, four touchdowns is a formality.
   const favPre = 1 / (1 + Math.exp(-spread / 6.5));
   const homeFavoured = homeSpread < 0;
@@ -578,7 +578,7 @@ export interface AnticipationInputs {
  *
  * Unlike the live score, `quality` here takes the *worse* of the two teams:
  * planning your evening around a mismatch is a bad idea no matter how good the
- * favourite is. Prominence still takes the better of the two, since that is what
+ * favorite is. Prominence still takes the better of the two, since that is what
  * drives the conversation.
  */
 export function anticipationScore(i: AnticipationInputs): number {

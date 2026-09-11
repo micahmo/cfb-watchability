@@ -65,7 +65,7 @@ const alerts = new AlertEngine(subscriptions);
 /** Each league polls independently, so a quiet NFL week cannot slow a busy Saturday. */
 /**
  * Evaluates a fresh snapshot for alerts, giving each subscriber the board as they
- * would see it so availability and favourites are resolved per person.
+ * would see it so availability and favorites are resolved per person.
  */
 function onSnapshot(snapshot: Snapshot): void {
   if (!subscriptions.available) return;
@@ -234,16 +234,16 @@ function parseSubscription(body: unknown): Parameters<SubscriptionStore["upsert"
   }
   if (wants.nfl.length === 0 && wants.cfb.length === 0) return null;
 
-  const favourites: Record<League, string[]> = { nfl: [], cfb: [] };
+  const favorites: Record<League, string[]> = { nfl: [], cfb: [] };
   for (const league of ["nfl", "cfb"] as League[]) {
-    const raw = Array.isArray(b?.favourites?.[league]) ? b.favourites[league] : [];
-    favourites[league] = raw
+    const raw = Array.isArray(b?.favorites?.[league]) ? b.favorites[league] : [];
+    favorites[league] = raw
       .filter((x: unknown) => typeof x === "string" && x.length <= 40)
       .slice(0, 20);
   }
 
   const zip = typeof b?.zip === "string" && /^\d{5}$/.test(b.zip) ? b.zip : null;
-  return { endpoint, keys: { p256dh, auth }, wants, zip, favourites };
+  return { endpoint, keys: { p256dh, auth }, wants, zip, favorites };
 }
 
 function leagueFrom(url: string): League {

@@ -6,7 +6,7 @@ const KEY = "football-watchability-prefs";
 export interface Prefs {
   league: League;
   /** Conferences to favour, per league. Empty means no preference. */
-  favourites: Record<League, string[]>;
+  favorites: Record<League, string[]>;
   /**
    * Postal code, used to work out which regional NFL game this viewer's own
    * channels are carrying. Kept per browser rather than on the server, so the
@@ -29,7 +29,7 @@ export interface Prefs {
 
 const DEFAULTS: Prefs = {
   league: "nfl",
-  favourites: { nfl: [], cfb: [] },
+  favorites: { nfl: [], cfb: [] },
   zip: null,
   marketOff: false,
   alerts: { nfl: [], cfb: [] },
@@ -44,7 +44,7 @@ function load(): Prefs {
     return {
       ...DEFAULTS,
       ...saved,
-      favourites: { ...DEFAULTS.favourites, ...(saved.favourites ?? {}) },
+      favorites: { ...DEFAULTS.favorites, ...(saved.favorites ?? {}) },
       alerts: { ...DEFAULTS.alerts, ...(saved.alerts ?? {}) },
     };
   } catch {
@@ -93,14 +93,14 @@ export function redetectMarket(): void {
   persist();
 }
 
-export function isFavourite(league: League, conference: string | null): boolean {
+export function isFavorite(league: League, conference: string | null): boolean {
   if (!conference) return false;
-  return prefs.favourites[league]?.includes(conference) ?? false;
+  return prefs.favorites[league]?.includes(conference) ?? false;
 }
 
-export function toggleFavourite(league: League, conference: string): void {
-  const current = prefs.favourites[league] ?? [];
-  prefs.favourites[league] = current.includes(conference)
+export function toggleFavorite(league: League, conference: string): void {
+  const current = prefs.favorites[league] ?? [];
+  prefs.favorites[league] = current.includes(conference)
     ? current.filter((c) => c !== conference)
     : [...current, conference];
   persist();

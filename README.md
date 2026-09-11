@@ -41,9 +41,9 @@ kickoff window, and NFL primetime, where the only game in its slot is starting a
 plainly how good it is expected to be. At most three a day per league, never for a game your
 market is not carrying. The screen stays awake while the board is open.
 
-**League tabs** switch between NFL and college; the NFL opens by default. **Favourite
+**League tabs** switch between NFL and college; the NFL opens by default. **Favorite
 conferences** push the games you care about up the board, weighted higher when both teams
-qualify than one. Tab, favourites and market all persist in the browser.
+qualify than one. Tab, favorites and market all persist in the browser.
 
 ## How the score works
 
