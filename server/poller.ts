@@ -11,8 +11,15 @@ const MAX_BACKOFF_MS = 15 * 60_000;
 const GROUPS = process.env.ESPN_GROUPS ?? "80";
 /** YYYYMMDD, or a YYYYMMDD-YYYYMMDD range. Unset means the live date range. */
 const DATES = process.env.ESPN_DATES || undefined;
-/** How far back the "just finished" recap reaches. Widen it to replay an old slate. */
-const RECENT_WINDOW_MS = Number(process.env.RECENT_WINDOW_HOURS ?? 10) * 60 * 60 * 1000;
+/**
+ * How far back the "just finished" recap reaches, measured from kickoff. Widen it
+ * to replay an old slate.
+ *
+ * Eighteen hours rather than ten so a Sunday night game is still there on Monday
+ * morning. Ten put an afternoon game out of reach by late the same evening, which
+ * is no use to anyone catching up the next day.
+ */
+const RECENT_WINDOW_MS = Number(process.env.RECENT_WINDOW_HOURS ?? 18) * 60 * 60 * 1000;
 /** The schedule barely moves, so it is fetched far less often than the scores. */
 const SCHEDULE_POLL_MS = Number(process.env.SCHEDULE_POLL_MS ?? 10 * 60 * 1000);
 /** How many days ahead the planning list looks. */

@@ -12,11 +12,14 @@ models, because a 45-38 college shootout and a 27-24 NFL game are not the same e
 
 No API key, no account, no database.
 
-| What is on right now | What to plan around |
-| --- | --- |
-| <img src="docs/board.png" width="420" alt="Live board"> | <img src="docs/upcoming.png" width="420" alt="Upcoming games grouped by day"> |
+| | What is on right now | What to plan around |
+| --- | --- | --- |
+| **NFL** | <img src="docs/nfl-live.png" width="330" alt="Live NFL board"> | <img src="docs/nfl-upcoming.png" width="330" alt="Upcoming NFL games grouped by day"> |
+| **College** | <img src="docs/cfb-live.png" width="330" alt="Live college board"> | <img src="docs/cfb-upcoming.png" width="330" alt="Upcoming college games grouped by day"> |
 
-<sub>Real teams, lines and networks. In-game scores and clocks are illustrative.</sub>
+<sub>Teams, lines, networks and listings are real. Scores, clocks and records in the live shots are
+fabricated, because a live board only exists while games are being played. See
+<a href="docs/design-notes.md">design notes</a> for how these are regenerated.</sub>
 
 ## What the board shows
 
@@ -274,7 +277,7 @@ only offers to install from a secure context, which rules out plain-http LAN add
 | `ESPN_DATES` | current range | `YYYYMMDD` or a range. Pins the board to a past slate |
 | `SCHEDULE_DAYS` | `8` | How far ahead the planning list looks |
 | `SCHEDULE_POLL_MS` | `600000` | Schedule refresh interval |
-| `RECENT_WINDOW_HOURS` | `10` | How far back the recap reaches |
+| `RECENT_WINDOW_HOURS` | `18` | How far back the recap reaches |
 | `ALLOWED_HOSTS` | - | Extra hostnames the dev server answers to, comma separated |
 
 Replaying a past Saturday is the easiest way to see a full board on a quiet weeknight:

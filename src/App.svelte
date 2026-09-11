@@ -77,13 +77,19 @@
    * A nudge, not an override. A favoured conference should float a game up past
    * its neighbours without letting a dull one outrank a genuinely great game.
    */
-  const FAVOURITE_BONUS = 8;
+  /**
+   * Graded, not binary. An all-AFC game is more of an AFC game than a
+   * cross-conference one, so it should outrank it, but the second team adds less
+   * than the first did: one team you care about is already most of the reason to
+   * watch. So the order is both teams, then one, then neither.
+   */
+  const FAVOURITE_BONUS = [0, 8, 13];
 
   function favouriteBoost(game: Game): number {
-    const hit =
-      isFavourite(prefs.league, game.home.conferenceName) ||
-      isFavourite(prefs.league, game.away.conferenceName);
-    return hit ? FAVOURITE_BONUS : 0;
+    const matches =
+      Number(isFavourite(prefs.league, game.home.conferenceName)) +
+      Number(isFavourite(prefs.league, game.away.conferenceName));
+    return FAVOURITE_BONUS[matches];
   }
 
   // The server ships every score component and the browser recombines them, so
@@ -286,7 +292,7 @@
               <!-- The unavailable games are already sorted to the bottom, so one
                    divider labels the whole tail instead of every row repeating it. -->
               {#if i === day.splitAt}
-                <p class="cutoff"><span>not on your channels</span></p>
+                <p class="cutoff">not on your channels</p>
               {/if}
               <UpcomingRow {game} score={anticipationOf(game)} />
             {/each}
@@ -330,23 +336,16 @@
     gap: 12px;
   }
   /* Scoped under .panel to outrank ".panel p", which sets the day cards' body
-     text to 13px and was silently winning against a bare .cutoff. */
+     text to 13px and was silently winning against a bare .cutoff.
+     No rule of its own: the rows above and below already carry full-width
+     borders, and a second half-width line butting into them read as a mistake. */
   .panel .cutoff {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin: 10px 14px 4px;
+    margin: 0;
+    padding: 10px 4px 2px;
     font-size: 10px;
     font-weight: 600;
     letter-spacing: 0.04em;
     color: var(--text-faint);
-    opacity: 0.75;
-  }
-  .panel .cutoff::after {
-    content: "";
-    flex: 1;
-    height: 1px;
-    background: var(--border);
   }
   .controls-row {
     display: flex;
