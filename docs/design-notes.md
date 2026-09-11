@@ -42,9 +42,36 @@ process starts gets one `summary?event=<id>` lookup, cached permanently, since a
 never changes.
 
 ```
+expectedDeficit = |spread| * progress
 market = clamp((expectedDeficit - actualDeficit) / 21) * (0.4 + 0.6 * progress)
 upset  = line ? max(market, 0.6 * rankUpset) : rankUpset
 ```
+
+### The expectation has to be pro-rated, or every game opens as an upset
+
+`expectedDeficit` started as the whole spread, compared against the score as it stood. That makes
+a big underdog maximally surprising before anything has happened, because at 0-0 they are, by
+construction, the full spread ahead of it. Norfolk State at Virginia, 46.5-point underdogs, scored
+0.46 at 0-0 five minutes into the first quarter and carried an `UPSET ALERT` on the live board.
+The same flaw ran the other way too: Norfolk State scored 0.50 while **losing 14-0**, which is the
+single most expected thing that could have happened.
+
+A spread is a full-game prediction, so the honest comparison is against how much of it should have
+been delivered by now. Pro-rating by `progress` does that, and it matches what a viewer feels:
+being level is remarkable in proportion to how long you have managed it.
+
+The lateness factor stays on top of the pro-rating rather than replacing it, so the same gap earns
+more as the game runs out of time to correct itself. Keeping both is also what preserves the
+genuinely early upset, which a simple "not before the fourth quarter" gate would have destroyed:
+
+| Situation, 46.5-point underdog | progress | upset | tagged |
+| --- | --- | --- | --- |
+| 0-0 at kickoff | 0.02 | 0.02 | no |
+| 3-3 in the first | 0.12 | 0.13 | no |
+| 3-3 at the end of the first | 0.25 | 0.30 | no |
+| 3-3 at half | 0.50 | 0.70 | yes |
+| **underdog up 14-0 in the first** | 0.15 | 0.49 | **yes** |
+| underdog within 3 late | 0.92 | 0.95 | yes |
 
 Rank survives at 60% strength deliberately. An unranked team beating a ranked one is a real
 story even when the market called it even, it is just not the same event as a 27-point underdog

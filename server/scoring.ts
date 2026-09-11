@@ -235,10 +235,23 @@ export function paceScore(
 }
 
 /**
- * How far ahead of the closing line the underdog is running.
+ * How far ahead of the closing line's *pace* the underdog is running.
  *
  * This is the honest measure of surprise. Rank gap cannot distinguish a 27.5-point
  * mismatch from a 3-point coin flip, and both can read as "ranked versus unranked".
+ *
+ * The comparison is against the spread pro-rated by how much game has been played,
+ * not against the whole number. A spread is a full-game prediction, so measuring a
+ * kickoff against it made every big underdog maximally surprising before a snap:
+ * Norfolk State, 46.5-point underdogs at Virginia, scored 0.46 at 0-0 in the first
+ * quarter and carried an UPSET ALERT tag into a game where nothing had happened.
+ * Being level is only remarkable relative to how long you have managed it, which is
+ * what the pro-rating says and what a viewer actually feels.
+ *
+ * The lateness factor stays on top of that, so the same gap earns more as the game
+ * runs out of time to correct itself. It is what keeps a genuinely early upset,
+ * a big underdog two touchdowns *up* in the first quarter, scoring well without
+ * letting a merely scoreless opening do the same.
  */
 export function marketUpsetScore(
   homeSpread: number,
@@ -246,13 +259,14 @@ export function marketUpsetScore(
   away: TeamSide,
   progress: number,
 ): number {
-  const expectedDeficit = Math.abs(homeSpread);
-  if (expectedDeficit === 0) return 0;
+  const fullGameSpread = Math.abs(homeSpread);
+  if (fullGameSpread === 0) return 0;
 
   const homeIsUnderdog = homeSpread > 0;
   const underdog = homeIsUnderdog ? home : away;
   const favorite = homeIsUnderdog ? away : home;
 
+  const expectedDeficit = fullGameSpread * progress;
   const vsLine = expectedDeficit - (favorite.score - underdog.score);
   if (vsLine <= 0) return 0;
   return clamp(vsLine / MAX_VS_LINE) * (0.4 + 0.6 * progress);
