@@ -98,7 +98,15 @@ async function withMarket(
     live: snapshot.live.map(annotate),
     upcoming: snapshot.upcoming.map(annotate),
     recent: snapshot.recent.map(annotate),
-    market: { zip, stations: market.stations, detected, city },
+    market: {
+      zip,
+      // Local call signs only. ESPN and NFL Network appear in every lineup and
+      // say nothing about which market this is, which is the whole point of
+      // showing the list back to the viewer.
+      stations: market.stations.filter((s) => /^[KW][A-Z]{2,3}$/.test(s)),
+      detected,
+      city,
+    },
   };
 }
 

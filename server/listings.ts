@@ -39,10 +39,8 @@ const REFERER = "https://tvlistings.gracenote.com/";
 const MAX_WINDOWS_PER_REFRESH = 8;
 
 export interface GameAvailability {
-  /** Stations in this market carrying the game, e.g. ["WBZ", "WPRI"]. */
+  /** Stations in this market carrying the game, e.g. ["WBZ"]. */
   stations: string[];
-  /** Kickoff slot key, used to spot a lineup that straddles two markets. */
-  window: string;
 }
 
 export interface Provider {
@@ -205,31 +203,12 @@ export class ListingsStore {
         const parts = episode.split(/\s+at\s+/i);
         if (parts.length !== 2) continue;
         const key = matchupKey(parts[0].trim(), parts[1].trim());
-        const existing = into.byMatchup.get(key) ?? {
-          stations: [],
-          window: String(event?.startTime ?? ""),
-        };
+        const existing = into.byMatchup.get(key) ?? { stations: [] };
         if (!existing.stations.includes(station)) existing.stations.push(station);
         into.byMatchup.set(key, existing);
         if (!into.stations.includes(station)) into.stations.push(station);
       }
     }
-  }
-
-  /**
-   * Whether these listings describe more than one television market.
-   *
-   * Any single market shows exactly one CBS and one FOX game in a Sunday
-   * afternoon window. Three or more distinct matchups in one window means the
-   * over-the-air list has swept in a neighbouring market's transmitters, and the
-   * answer it gives is no longer the answer for anyone in particular.
-   */
-  private straddlesMarkets(listings: MarketListings): boolean {
-    const perWindow = new Map<string, number>();
-    for (const entry of listings.byMatchup.values()) {
-      perWindow.set(entry.window, (perWindow.get(entry.window) ?? 0) + 1);
-    }
-    return [...perWindow.values()].some((n) => n > 2);
   }
 
   /**
@@ -280,33 +259,41 @@ export class ListingsStore {
 
   /** Cached per zip, one refresh at a time, and stale data beats no data. */
   /**
-   * Listings for a postal code, narrowed to one market automatically.
+   * Listings for a postal code, narrowed to a single television market.
    *
-   * Starts over the air, because it needs nothing but the postal code. Near a
-   * boundary that list spans several markets at once, and when it does, this
-   * quietly re-reads through a real provider's lineup for the market instead.
-   * The viewer is never asked to claim they have a cable company they do not.
+   * The grid's default is the over-the-air list, which is every transmitter the
+   * area could receive. Near a boundary that spans several markets at once:
+   * Fitchburg MA returns Boston, Providence, Manchester and Springfield
+   * affiliates together, and the viewer receives one market's worth of those.
+   *
+   * So it always narrows rather than waiting for the markets to visibly disagree.
+   * Whether they happen to be showing the same games this week is luck, and
+   * relying on it would list channels the viewer does not get. Satellite lineups
+   * are scoped to the television market the postal code sits in, which makes them
+   * the best answer available to "which market is this really".
    */
   async resolve(zip: string, games: Game[]): Promise<MarketListings | null> {
-    const chosen = this.resolvedLineup.get(zip);
-    if (chosen !== undefined) return this.get(zip, chosen, games);
-
-    const overAir = await this.get(zip, lineupFromId(null, null), games);
-    if (overAir === null || !this.straddlesMarkets(overAir)) return overAir;
+    const known = this.resolvedLineup.get(zip);
+    if (known !== undefined) return this.get(zip, known, games);
 
     try {
       const provider = this.pickLineup(await this.providers(zip));
-      if (provider === null) return overAir;
-      const lineup = lineupFromId(provider.lineupId, provider.device);
-      const narrowed = await this.get(zip, lineup, games);
-      if (narrowed === null) return overAir;
-      this.resolvedLineup.set(zip, lineup);
-      console.log(`[listings] ${zip}: over-air spans markets, using ${provider.name}`);
-      return narrowed;
+      if (provider !== null) {
+        const lineup = lineupFromId(provider.lineupId, provider.device);
+        const narrowed = await this.get(zip, lineup, games);
+        if (narrowed !== null) {
+          this.resolvedLineup.set(zip, lineup);
+          console.log(`[listings] ${zip}: reading ${provider.name}`);
+          return narrowed;
+        }
+      }
     } catch (err) {
-      console.error(`[listings] ${zip} narrowing failed: ${err instanceof Error ? err.message : err}`);
-      return overAir;
+      console.error(
+        `[listings] ${zip} narrowing failed: ${err instanceof Error ? err.message : err}`,
+      );
     }
+    // No market lineup, or it came back empty. Over the air is worse but real.
+    return this.get(zip, lineupFromId(null, null), games);
   }
 
   async get(zip: string, lineup: Lineup, games: Game[]): Promise<MarketListings | null> {

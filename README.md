@@ -183,12 +183,16 @@ your own response, which you could do by typing a different postal code anyway.
 
 **A postal code alone is not always one market.** The listings grid's default is the
 over-the-air list, which near a boundary sweeps in every transmitter the area could receive:
-Fitchburg MA returns Boston, Providence, Manchester and Springfield affiliates together, and
-those are separate markets that can be airing different games. The board notices, because any one
-market shows exactly one CBS and one FOX game per Sunday window, so three or more matchups in a
-window means the list straddles two. When that happens it silently re-reads through a real
-provider's lineup for the market and says nothing about it. Rensselaer IN returns three 1:00
-games over the air and resolves to DISH Chicago, which drops the Indianapolis game correctly.
+Fitchburg MA returns Boston, Providence, Manchester and Springfield affiliates together, and a
+viewer receives one market's worth of those.
+
+So the board always narrows to a single market rather than waiting for the lists to visibly
+disagree. Whether neighbouring markets happen to be showing the same games in a given week is
+luck, and relying on it would name channels the viewer cannot receive. Satellite lineups are
+scoped to the television market a postal code sits in, which makes them the best available answer
+to "which market is this really": Fitchburg resolves to DISH Boston and reports WBZ, WCVB, WFXT
+and WBTS, while Rensselaer IN resolves to DISH Chicago and correctly drops the Indianapolis
+game that its over-the-air list had swept in.
 
 Nobody is asked to name their provider, which matters because the listings source has no
 streaming lineups at all: no YouTube TV, Hulu Live or Fubo, only over-the-air, cable and
