@@ -383,6 +383,12 @@
      about. Scoped under .panel to outrank ".panel p", which sets card body text
      to 13px and was silently winning against a bare .cutoff. */
   .panel .cutoff {
+    /* Centred as a flex row rather than by vertical-align. The marker is a
+       replaced element aligned on the baseline, which left it four pixels above
+       the text's optical centre; these are uppercase with no descenders, so
+       centring on the line box lands within half a pixel of the ink. */
+    display: flex;
+    align-items: center;
     /* Bounded top and bottom, so it is an entry in the list rather than the top
        of the entry below it. A single rule above was not enough: it left the
        header and the first unavailable row sharing one cell, which is the thing
@@ -405,8 +411,8 @@
   .panel .cutoff .down {
     width: 9px;
     height: 11px;
-    margin-left: 4px;
-    vertical-align: -1px;
+    margin-left: 5px;
+    flex: none;
     fill: none;
     stroke: currentColor;
     stroke-width: 2;
