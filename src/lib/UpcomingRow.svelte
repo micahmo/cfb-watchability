@@ -2,13 +2,15 @@
   import type { Game } from "../../shared/types";
   import { kickoffTime, scoreColor, teamColor } from "./format";
 
-  let { game }: { game: Game } = $props();
+  let { game, score }: { game: Game; score?: number } = $props();
 
-  const accent = $derived(scoreColor(game.anticipation ?? 0));
+  const shown = $derived(score ?? game.anticipation ?? 0);
+
+  const accent = $derived(scoreColor(shown));
 </script>
 
 <div class="row">
-  <div class="score mono" style="color: {accent}">{Math.round(game.anticipation ?? 0)}</div>
+  <div class="score mono" style="color: {accent}">{Math.round(shown)}</div>
   <div class="when mono">
     <span class="time">{kickoffTime(game.startDate)}</span>
   </div>

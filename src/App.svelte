@@ -3,9 +3,10 @@
   import { PROFILES, combine } from "../shared/weights";
   import { fetchSnapshot } from "./lib/api";
   import { dayDate, dayKey, dayLabel, relativeTime, scoreColor } from "./lib/format";
-  import { prefs } from "./lib/prefs.svelte";
+  import { isFavourite, prefs } from "./lib/prefs.svelte";
   import Controls from "./lib/Controls.svelte";
   import LeagueTabs from "./lib/LeagueTabs.svelte";
+  import FavouriteConferences from "./lib/FavouriteConferences.svelte";
   import GameCard from "./lib/GameCard.svelte";
   import UpcomingRow from "./lib/UpcomingRow.svelte";
 
@@ -49,12 +50,45 @@
     return () => clearInterval(tick);
   });
 
+  /**
+   * A nudge, not an override. A favoured conference should float a game up past
+   * its neighbours without letting a dull one outrank a genuinely great game.
+   */
+  const FAVOURITE_BONUS = 8;
+
+  function favouriteBoost(game: Game): number {
+    const hit =
+      isFavourite(prefs.league, game.home.conferenceName) ||
+      isFavourite(prefs.league, game.away.conferenceName);
+    return hit ? FAVOURITE_BONUS : 0;
+  }
+
   // The server ships every score component, so switching profiles is instant
   // and needs no round trip.
   function scoreOf(game: Game): number {
     if (!game.score) return 0;
-    return combine(game.score, PROFILES[prefs.profile], game.score.maxTotal);
+    const base = combine(game.score, PROFILES[prefs.profile], game.score.maxTotal);
+    return Math.min(100, base + favouriteBoost(game));
   }
+
+  function anticipationOf(game: Game): number {
+    return Math.min(100, (game.anticipation ?? 0) + favouriteBoost(game));
+  }
+
+  /** Conferences present in the current league's slate, for the preference list. */
+  const conferences = $derived.by(() => {
+    const all = [
+      ...(snapshot?.live ?? []),
+      ...(snapshot?.upcoming ?? []),
+      ...(snapshot?.recent ?? []),
+    ];
+    const names = new Set<string>();
+    for (const g of all) {
+      if (g.home.conferenceName) names.add(g.home.conferenceName);
+      if (g.away.conferenceName) names.add(g.away.conferenceName);
+    }
+    return [...names].sort();
+  });
 
   const live = $derived.by(() =>
     [...(snapshot?.live ?? [])].sort((a, b) => scoreOf(b) - scoreOf(a)),
@@ -91,7 +125,7 @@
         label: dayLabel(games[0].startDate),
         date: dayDate(games[0].startDate),
         games: [...games]
-          .sort((a, b) => (b.anticipation ?? 0) - (a.anticipation ?? 0))
+          .sort((a, b) => anticipationOf(b) - anticipationOf(a))
           .slice(0, MAX_PER_DAY),
       }));
   });
@@ -119,7 +153,10 @@
       <span class="mono updated">{updatedLabel}</span>
     </div>
   </div>
-  <Controls />
+  <div class="controls-row">
+    <Controls />
+    <FavouriteConferences {conferences} league={prefs.league} />
+  </div>
 </header>
 
 {#if loading}
@@ -165,7 +202,7 @@
           </h3>
           <div class="panel tight">
             {#each day.games as game (game.id)}
-              <UpcomingRow {game} />
+              <UpcomingRow {game} score={anticipationOf(game)} />
             {/each}
           </div>
         </div>
@@ -194,6 +231,12 @@
     align-items: center;
     justify-content: space-between;
     gap: 12px;
+  }
+  .controls-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
   }
   .status {
     display: flex;
