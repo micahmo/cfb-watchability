@@ -6,8 +6,8 @@ import type { League } from "../shared/types.js";
 import { checkDurability, explain, type Durability } from "./storage.js";
 
 /** The alert kinds a viewer can subscribe to, per league. */
-export type Category = "hero" | "classic" | "upset" | "kickoff";
-export const CATEGORIES: Category[] = ["hero", "classic", "upset", "kickoff"];
+export type Category = "hero" | "classic" | "upset" | "kickoff" | "primetime";
+export const CATEGORIES: Category[] = ["hero", "classic", "upset", "kickoff", "primetime"];
 
 export interface Subscription {
   id: string;

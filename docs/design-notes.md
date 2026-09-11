@@ -311,6 +311,19 @@ you missed, and that everything fires on a **transition** rather than a state: a
 | Instant classic | The same game later crosses 85 | None |
 | Upset alert | Underdog level or ahead within one score, spread 7+ | Fourth quarter only |
 | Kickoff | Best game in a window of four or more games | At kickoff |
+| Primetime | The only game in its window, NFL only | At kickoff |
+
+**Primetime is the exact inverse of kickoff**, so the two can never both fire. Kickoff says "this
+is the pick of a crowded slate"; primetime says "there is nothing to choose between, but football
+is on". No clock heuristic and no hardcoded slots are needed, because "the only game in its
+window" finds Thursday, Sunday and Monday night on a normal week and, on a holiday week, also
+finds the Thanksgiving afternoon games and Black Friday. An after-7pm rule would have missed
+exactly those, and they are the ones most worth knowing about. Measured: three solo windows in a
+normal week, eight in Thanksgiving week.
+
+Both kickoff alerts carry how good the game is expected to be, in words and as the rating. That
+matters most for primetime, whose premise is that the only game on might be a bad one; saying
+"Not expected to be much" is the honest version of the alert rather than a failure of it.
 
 Plus: seed state on the first poll after startup so a restart mid-slate announces nothing; one
 notification per game per tier, ever; a global cooldown with simultaneous crossings coalesced into

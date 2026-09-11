@@ -1,6 +1,6 @@
 import type { League } from "../../shared/types";
 
-export type Category = "hero" | "classic" | "upset" | "kickoff";
+export type Category = "hero" | "classic" | "upset" | "kickoff" | "primetime";
 
 export interface PushConfig {
   available: boolean;

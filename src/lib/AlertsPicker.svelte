@@ -38,12 +38,14 @@
     classic: "Instant classic",
     upset: "Upset alert",
     kickoff: "Kickoff",
+    primetime: "Primetime",
   };
   const BLURB: Record<Category, string> = {
     hero: "A game gets good enough to switch to, with time left to get there",
     classic: "It goes from good to memorable",
     upset: "An underdog is doing something it should not be",
     kickoff: "The pick of a busy kickoff window is starting",
+    primetime: "The only game in its slot is on. Might not be great, but football is on",
   };
 
   let config = $state<PushConfig | null>(null);
@@ -123,7 +125,8 @@
         never sent.
       </p>
       <div class="grid">
-        {#each config.categories as category (category)}
+        <!-- College has no standalone slot: a Saturday night is a dozen games. -->
+        {#each config.categories.filter((c) => c !== "primetime" || league === "nfl") as category (category)}
           <label class="item" class:on={chosen.includes(category)}>
             <input
               type="checkbox"

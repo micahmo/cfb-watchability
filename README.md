@@ -34,9 +34,11 @@ kickoff time, the line, the over/under and the network.
 
 **Just finished**, the recent recap, best first. Games stay on the board for eighteen hours.
 
-**Alerts**, optional, off by default. Four kinds, chosen per league: a game becoming worth
-switching to, one turning into something memorable, an upset in progress, and the pick of a busy
-kickoff window. At most three a day per league, never for a game your market is not carrying.
+**Alerts**, optional, off by default. Five kinds, chosen per league: a game becoming worth
+switching to, one turning into something memorable, an upset in progress, the pick of a busy
+kickoff window, and NFL primetime, where the only game in its slot is starting and the alert says
+plainly how good it is expected to be. At most three a day per league, never for a game your
+market is not carrying. The screen stays awake while the board is open.
 
 **League tabs** switch between NFL and college; the NFL opens by default. **Favourite
 conferences** push the games you care about up the board, weighted higher when both teams

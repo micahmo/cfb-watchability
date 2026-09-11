@@ -1,11 +1,10 @@
 /**
- * Holds a screen wake lock while there is a game to watch.
+ * Holds a screen wake lock for as long as the board is on screen.
  *
- * Leaving the board up during a game and having the phone dim halfway through a
- * drive is the annoying case, so there is nothing to configure. Unlike a
- * presence board, though, this one gets left open on quiet afternoons too, and
- * holding the screen awake to display "nothing is live right now" is just
- * battery. So the lock follows the live list rather than the app being open.
+ * Bringing it up is the act of deciding to watch, so the screen dimming halfway
+ * through a drive is the annoying case and there is nothing to configure:
+ * closing the app is how you stop. Tying it to whether a game was live seemed
+ * thriftier and was really just second-guessing the person holding the phone.
  *
  * The browser drops the lock whenever the page stops being visible and never
  * restores it, so the visibility listener is the whole mechanism rather than a
@@ -42,9 +41,9 @@ async function sync(): Promise<void> {
   }
 }
 
-/** Call with true while games are live, false when the board goes quiet. */
-export function setKeepAwake(active: boolean): void {
-  wanted = active;
+/** Starts holding the lock, and re-takes it whenever the app comes back on screen. */
+export function keepScreenAwake(): void {
+  wanted = true;
   if (!listening) {
     listening = true;
     document.addEventListener("visibilitychange", () => void sync());

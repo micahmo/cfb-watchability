@@ -10,7 +10,7 @@
   import AlertsPicker from "./lib/AlertsPicker.svelte";
   import UpdatePrompt from "./lib/UpdatePrompt.svelte";
   import { checkForUpdateNow } from "./lib/appUpdate";
-  import { setKeepAwake } from "./lib/keepAwake";
+
   import GameCard from "./lib/GameCard.svelte";
   import UpcomingRow from "./lib/UpcomingRow.svelte";
 
@@ -172,11 +172,6 @@
   const live = $derived.by(() =>
     [...(snapshot?.live ?? [])].sort(byWatchableThen(scoreOf)),
   );
-
-  // Hold the screen on only while there is something to watch.
-  $effect(() => {
-    setKeepAwake(live.length > 0);
-  });
 
   const top = $derived(live[0] ?? null);
   const topScore = $derived(top ? scoreOf(top) : 0);

@@ -29,6 +29,18 @@ const HERO_MIN_SECONDS_LEFT = 60;
 const UPSET_TENSION = 0.55;
 /** Enough games in a window that choosing between them is actually a problem. */
 const KICKOFF_MIN_SLATE = 4;
+/**
+ * A window with one game in it is the whole slate, which is its own reason to
+ * say something: not "this is the best of several" but "football is on".
+ *
+ * Deliberately the exact inverse of the kickoff rule, so the two can never both
+ * fire. No clock heuristic and no hardcoded slots: "the only game in its window"
+ * finds Thursday, Sunday and Monday night on a normal week, and on a holiday week
+ * it also finds the Thanksgiving afternoon games and Black Friday, which an
+ * after-7pm rule would have missed and which are exactly the ones worth knowing
+ * about. College has no equivalent, so this is NFL only.
+ */
+const PRIMETIME_MAX_SLATE = 1;
 /** How long after kickoff a "starting now" alert is still true. */
 const KICKOFF_GRACE_MS = 5 * 60 * 1000;
 
@@ -144,10 +156,13 @@ export class AlertEngine {
     return out;
   }
 
-  /** The pick of a kickoff window big enough to be worth picking from. */
+  /** Kickoff alerts, and their inverse: a window with only one game in it. */
   private kickoffCandidates(sub: Subscription, snapshot: Snapshot, now: number): Alert[] {
     const league = snapshot.league;
-    if (!(sub.wants[league] ?? []).includes("kickoff")) return [];
+    const wants = sub.wants[league] ?? [];
+    const wantsKickoff = wants.includes("kickoff");
+    const wantsPrimetime = wants.includes("primetime") && league === "nfl";
+    if (!wantsKickoff && !wantsPrimetime) return [];
 
     const slots = new Map<string, Game[]>();
     for (const game of snapshot.upcoming) {
@@ -159,9 +174,9 @@ export class AlertEngine {
     const favourites = sub.favourites[league] ?? [];
     const out: Alert[] = [];
     for (const [startDate, games] of slots) {
-      // A lone primetime game needs no announcement: there is nothing to choose
-      // between, and anyone who wanted it already knows.
-      if (games.length < KICKOFF_MIN_SLATE) continue;
+      const solo = games.length <= PRIMETIME_MAX_SLATE;
+      const category: Category = solo ? "primetime" : "kickoff";
+      if (solo ? !wantsPrimetime : !(wantsKickoff && games.length >= KICKOFF_MIN_SLATE)) continue;
       const kick = Date.parse(startDate);
       // At kickoff, not before. A heads-up half an hour early is the planning
       // list again; the point of this one is that it is starting now.
@@ -175,7 +190,7 @@ export class AlertEngine {
 
       this.announced.add(key);
       out.push({
-        category: "kickoff",
+        category,
         game: best,
         score: rank(best),
         alternatives: games.length - 1,
@@ -245,11 +260,33 @@ export class AlertEngine {
   }
 }
 
+/** The pregame bands the board itself uses, in words rather than a bare number. */
+function expectation(score: number): string {
+  if (score >= 80) return "One of the best on the board";
+  if (score >= 70) return "Worth clearing the evening";
+  if (score >= 55) return "Worth having on";
+  return "Not expected to be much";
+}
+
+/** "in the 2nd", or "in OT". Only the third quarter was special-cased, so every
+ *  other one read as "1th", "2th", "4th". */
+function quarter(period: number): string {
+  if (period > 4) return "in OT";
+  const suffix = period === 1 ? "st" : period === 2 ? "nd" : period === 3 ? "rd" : "th";
+  return `in the ${period}${suffix}`;
+}
+
 function detail(alert: Alert): string {
   const game = alert.game;
   const network = game.broadcast ? ` · ${game.broadcast}` : "";
-  if (alert.category === "kickoff") return `Kicking off now${network}`;
-  return `${game.away.abbrev} ${game.away.score}, ${game.home.abbrev} ${game.home.score} · ${game.clock} in the ${game.period}${game.period === 3 ? "rd" : "th"}${network}`;
+  if (alert.category === "kickoff" || alert.category === "primetime") {
+    // "Kicking off now" only repeats the title. What is actually useful before a
+    // game is how good it is expected to be, and that matters most for the
+    // primetime alert, whose whole premise is that the only game on might be a
+    // bad one. Saying so is the point.
+    return `${expectation(alert.score)} · rated ${Math.round(alert.score)}${network}`;
+  }
+  return `${game.away.abbrev} ${game.away.score}, ${game.home.abbrev} ${game.home.score} · ${game.clock} ${quarter(game.period)}${network}`;
 }
 
 export function buildPayload(alerts: Alert[]): unknown {
@@ -267,13 +304,16 @@ export function buildPayload(alerts: Alert[]): unknown {
   const title =
     lead.category === "classic"
       ? `${matchup} is turning into something`
-      : lead.category === "kickoff"
-        ? `${matchup} kicks off now`
-        : lead.category === "upset"
-          ? `Upset alert: ${matchup}`
-          : lead.alternatives > 0
-            ? `Switch to ${matchup}`
-            : `${matchup} is worth putting on`;
+      : lead.category === "primetime"
+        ? // Not a claim that it is good. The point is that it is the only one on.
+          `Football is on: ${matchup}`
+        : lead.category === "kickoff"
+          ? `${matchup} kicks off now`
+          : lead.category === "upset"
+            ? `Upset alert: ${matchup}`
+            : lead.alternatives > 0
+              ? `Switch to ${matchup}`
+              : `${matchup} is worth putting on`;
 
   const also = alerts
     .slice(1)
