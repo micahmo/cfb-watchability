@@ -320,7 +320,7 @@
             </div>
             {#if day.unavailable.length > 0}
               <div class="blocked">
-                <p class="cutoff"><span class="down" aria-hidden="true">&darr;</span> not on your channels</p>
+                <p class="cutoff">not on your channels <span class="down" aria-hidden="true">&#9662;</span></p>
                 {#each day.unavailable as game (game.id)}
                   <UpcomingRow {game} score={anticipationOf(game)} />
                 {/each}
@@ -393,11 +393,15 @@
     letter-spacing: 0.1em;
     color: var(--text-faint);
   }
-  /* Points at what the header is about. A caret would read as a dropdown, which
-     is what it means everywhere else on this page. */
+  /* Points at what the header is about. A solid triangle rather than an arrow
+     glyph, which at this size renders tall and thin and looked out of place.
+     Kept faint and trailing so it reads as an indicator rather than the dropdown
+     control the same shape means elsewhere on the page. */
   .panel .cutoff .down {
-    margin-right: 2px;
-    opacity: 0.8;
+    margin-left: 3px;
+    font-size: 9px;
+    opacity: 0.65;
+    vertical-align: 1px;
   }
   .controls-row {
     display: flex;
