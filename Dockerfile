@@ -14,11 +14,17 @@ RUN npm run build
 FROM node:22-alpine AS runtime
 WORKDIR /app
 
-# The compiled server uses only the Node standard library, so the runtime image
-# carries no node_modules at all. tzdata is needed for TZ to resolve: the poller
-# asks ESPN for "yesterday through today", and those day boundaries have to be in
-# US Eastern or late kickoffs fall outside the window.
+# tzdata is needed for TZ to resolve: the poller asks ESPN for "yesterday through
+# today", and those day boundaries have to be in US Eastern or late kickoffs fall
+# outside the window.
 RUN apk add --no-cache tzdata wget
+
+# Production dependencies only. The server ran on the Node standard library alone
+# until web push arrived, which needs VAPID signing and payload encryption and is
+# not something to hand-roll. Omitting this stage is what took the container down
+# on the first deploy after adding it.
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev && npm cache clean --force
 
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/dist-server ./dist-server
