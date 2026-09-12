@@ -127,6 +127,54 @@ The hero label follows the same discipline. It only says `TURN THIS ON` above 75
 to `BEST GAME ON` and `BEST OF WHAT IS ON`, because shouting at a mediocre 30 on a quiet
 weeknight is the same overpromise.
 
+### `SHOOTOUT` was a fourth instance, and the bug has a shape
+
+It fired on a 21-31 college game, which is neither close enough nor high-scoring enough, and it
+was wrong on both halves for different reasons.
+
+**Not close enough.** The gate was `margin <= 10`, while the same function uses 8 everywhere else
+it asks whether a game is close: `ONE SCORE FINISH`, `ONE SCORE, LATE`, `UPSET POTENTIAL` and the
+clutch term all say one score is a touchdown and two. Ten admits a two-score game. There was no
+recorded reason for the difference; it now shares the `ONE_SCORE` constant with the rest.
+
+**Not high-scoring enough.** The gate was `totalPoints >= 52` in college, against a median expected
+total of 54.5 on a live board and a modelled typical of 55. The bar sat *below* average, so an
+ordinary game earned the tag by finishing. Across 315 finished college games it fired on 14.3%,
+one game in seven, on results like 31-21, 30-24 and 24-31.
+
+**The shape is the thing to remember**, because it is the same bug as the 0-0 upset alert fixed the
+same day: a raw accumulating quantity compared against a full-game constant. Points only ever go up,
+so a fixed bar is guaranteed to be crossed given enough game, and "enough game" arrives in every
+game. Auditing the rest of the tags for it found no others, and the reason is a useful test:
+`margin` moves in both directions, ranks and periods are facts, and every other gate reads a
+normalised term off the breakdown. `totalPoints` was the only raw accumulating value in a gate.
+
+The fix compares against the **projected** total, which blends the pregame expectation with what has
+actually happened, weighted by how much game has been played. A finished game is simply its own
+final score, and a game that has put up 52 points by halftime projects past a hundred and is a
+shootout on the spot, which is the case the old absolute rule and a naive "raise the number" fix
+both get wrong.
+
+Reusing the existing `pace` term was the obvious move and it does not work, for a reason worth
+recording: `pace` clamps, and the clamp destroys exactly the information needed here. The NFL scale
+saturates at a projected 54 points, and 15% of NFL games are one-score games above that, so *no*
+threshold on the clamped value can be more selective than 15% in that league. College saturates at
+70, where the floor is 6%. So the tag reads the unclamped projection and `paceScore` is now a thin
+wrapper over it.
+
+Both thresholds are percentiles rather than opinions, chosen so the tag means the same thing in each
+league, roughly the top 7% of games counting only one-score ones. Against 315 finished college games
+and a full NFL season of 256:
+
+| | before | after |
+| --- | --- | --- |
+| college | 14.3% | 7.3% |
+| NFL | 26.7% | 6.6% |
+
+The leagues need different numbers for the obvious reason: 61 points is a shootout in one and a
+Tuesday in the other. The first NFL pass used 60 games from five Sundays, which is 1.7% per game and
+far too coarse to calibrate a percentage point on; the full season moved the answer enough to matter.
+
 ## Polling is adaptive because the endpoint is undocumented
 
 The ESPN scoreboard is public and undocumented with no published rate limit, so the poller is

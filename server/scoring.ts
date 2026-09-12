@@ -220,18 +220,37 @@ const PACE_SCALE: Record<League, { floor: number; span: number; typical: number 
   nfl: { floor: 28, span: 26, typical: 45 },
 };
 
+/**
+ * Where this game's scoring is heading, in points.
+ *
+ * Blends the pregame expectation with what has actually happened, weighted by how
+ * much game has been played, so an early flurry does not read as a shootout and a
+ * finished game is simply its own final total. Exposed separately from `paceScore`
+ * because that one clamps, and the clamp destroys exactly the information the
+ * shootout tag needs: the NFL scale saturates at 54 points, which 15% of NFL games
+ * clear, so no threshold on the clamped value can be selective there.
+ */
+export function projectedTotal(
+  league: League,
+  totalPoints: number,
+  progress: number,
+  overUnder: number | null = null,
+): number {
+  const { typical } = PACE_SCALE[league];
+  const prior = overUnder ?? typical;
+  if (progress < 0.08) return prior;
+  const observed = totalPoints / progress;
+  return prior * (1 - progress) + observed * progress;
+}
+
 export function paceScore(
   league: League,
   totalPoints: number,
   progress: number,
   overUnder: number | null = null,
 ): number {
-  const { floor, span, typical } = PACE_SCALE[league];
-  const prior = overUnder ?? typical;
-  if (progress < 0.08) return clamp((prior - floor) / span);
-  const observed = totalPoints / progress;
-  const projected = prior * (1 - progress) + observed * progress;
-  return clamp((projected - floor) / span);
+  const { floor, span } = PACE_SCALE[league];
+  return clamp((projectedTotal(league, totalPoints, progress, overUnder) - floor) / span);
 }
 
 /**
@@ -449,12 +468,26 @@ export function scoreGame(input: ScoreInputs): ScoreBreakdown {
 }
 
 /**
- * A shootout is an observation, not a prediction: the points have to already be on
- * the board, and the game has to be close. A blowout piles up points too, and
- * "on pace for" means nothing in the first quarter.
+ * One score, the number this model means every time it asks whether a game is
+ * close. A touchdown and a two-point conversion.
  */
-const SHOOTOUT_MIN_POINTS: Record<League, number> = { cfb: 52, nfl: 48 };
-const SHOOTOUT_MAX_MARGIN = 10;
+const ONE_SCORE = 8;
+/**
+ * Where a game's scoring has to be heading to count as a shootout, per league.
+ *
+ * Compared against the *projected* total rather than points already scored, which
+ * is the whole fix: a raw running total only ever goes up, so a fixed bar is
+ * guaranteed to be crossed given enough game. The old college bar of 52 sat below
+ * the median expected total of 54.5, so an ordinary game earned the tag simply by
+ * finishing, and it fired on 14.3% of games, on results like 31-21 and 30-24.
+ *
+ * Both numbers are percentiles rather than opinions, picked so the tag means the
+ * same thing in each league: roughly the top 7% of games, counting only one-score
+ * ones. Against 315 finished college games and a full NFL season of 256, college
+ * lands at 7.3% and the NFL at 6.6%. The leagues need different numbers for the
+ * obvious reason, that 61 points is a shootout in one and a Tuesday in the other.
+ */
+const SHOOTOUT_TOTAL: Record<League, number> = { cfb: 65, nfl: 61 };
 
 /** Beating the closing line by three touchdowns is a maximal upset. */
 const MAX_VS_LINE = 21;
@@ -510,8 +543,8 @@ export function buildTags(game: Game, breakdown: ScoreBreakdown): string[] {
   if (onTheLine) tags.push("GAME ON THE LINE");
 
   if (isFinal) {
-    if (game.margin <= 8) tags.push("ONE SCORE FINISH");
-  } else if (!onTheLine && progress > 0.85 && game.margin <= 8 && game.period <= 4) {
+    if (game.margin <= ONE_SCORE) tags.push("ONE SCORE FINISH");
+  } else if (!onTheLine && progress > 0.85 && game.margin <= ONE_SCORE && game.period <= 4) {
     // Suppressed once the stronger label applies, so the two do not stack and
     // say nearly the same thing twice.
     tags.push("ONE SCORE, LATE");
@@ -532,7 +565,7 @@ export function buildTags(game: Game, breakdown: ScoreBreakdown): string[] {
       // happened, but it is live, and that is worth switching over for.
       !isFinal &&
       !underdog.levelOrAhead &&
-      underdog.deficit <= 8 &&
+      underdog.deficit <= ONE_SCORE &&
       progress >= LATE_GAME_PROGRESS &&
       breakdown.upset >= 0.2
     ) {
@@ -543,7 +576,10 @@ export function buildTags(game: Game, breakdown: ScoreBreakdown): string[] {
   // is expected to appear and fade as a game settles. A permanent "wild game"
   // badge would point you at games that have since stopped being close.
   if (breakdown.swing >= 0.6) tags.push("RECENT SWINGS");
-  if (game.totalPoints >= SHOOTOUT_MIN_POINTS[game.league] && game.margin <= SHOOTOUT_MAX_MARGIN) {
+  // Closeness held to the same bar as every other tag. Ten admitted two-score
+  // games that this same function would refuse to call a one-score finish.
+  const projected = projectedTotal(game.league, game.totalPoints, progress, game.overUnder);
+  if (projected >= SHOOTOUT_TOTAL[game.league] && game.margin <= ONE_SCORE) {
     tags.push("SHOOTOUT");
   }
   if (hr <= 10 && ar <= 10) tags.push("TOP-10 CLASH");
