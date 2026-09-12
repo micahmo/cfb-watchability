@@ -293,6 +293,34 @@ The grace period grew from five minutes to two hours for the same reason: the tr
 a delay can push that back a long way, and the bound now exists only so a game postponed to another
 day does not announce itself when it eventually starts.
 
+### Widening the window re-opened a hole the old one closed by accident
+
+A restart mid-afternoon then announced a window whose games had kicked off before the process
+started. Seen live: a kickoff alert nine minutes into the first quarter, reading "rated 13, not
+expected to be much" about a marquee game. Two symptoms, one cause. The process had never seen those
+games pregame, so the anticipation memo was empty and the rating collapsed to the favourite bonus
+alone, which is 13 for two favoured conferences; and kickoff windows were never seeded, so the
+window looked unannounced.
+
+The seeding block already existed and its own comment said a Force Update mid-Saturday must not
+re-announce the afternoon. It seeded `hero`, `classic` and `upset`. Kickoff did not need it while
+the trigger was a five-minute clock window, because a restart could not land inside one. Moving to a
+two-hour state window silently removed that protection. Live games now seed their windows too, and a
+game this process never saw pregame is never announced at all, so a rating nobody can vouch for
+cannot be sent.
+
+### Ranking and display are different jobs
+
+The first attempt at the rating fixed it by clamping inside the ranking function, which is where the
+board clamps. That made the two best games in a window tie at the ceiling, and a stable sort handed
+the window to whichever came first, which was one that had not kicked off yet, so the window went
+unannounced entirely. The clamp belongs only where a person reads the number.
+
+The wording moved with it. Every other alert says "rated", meaning the live score. Before kickoff
+the number is an expectation, and calling both "rated" is what made the notification and the board
+look like they disagreed when the board had simply switched that game to its live rating the moment
+it started.
+
 ## A faster feed changed what an old metric meant
 
 `RECENT SWINGS` appeared on two 0-0 games at once. The tag reads `swing`, which was the **cumulative

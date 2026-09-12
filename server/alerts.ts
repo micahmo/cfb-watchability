@@ -197,13 +197,33 @@ export class AlertEngine {
       const key = `${league}:${startDate}`;
       if (this.announced.has(key)) continue;
 
-      // Anticipation is only carried while a game is pregame, so it is remembered
-      // as each snapshot goes by and read back here. Without it the moment a game
-      // kicks off it would rank last in its own window.
+      /*
+       * Anticipation is only carried while a game is pregame, so it is remembered
+       * as each snapshot goes by and read back here. Without it, the moment a game
+       * kicks off it would rank last in its own window.
+       *
+       * Deliberately unclamped. The board clamps the number it *shows* at 100, and
+       * clamping here instead made two marquee games tie at the ceiling: the stable
+       * sort then handed the window to whichever came first, which was a game that
+       * had not kicked off, and the whole window went unannounced. Ranking and
+       * display are different jobs and the ceiling belongs only to the second.
+       */
       const rank = (g: Game) =>
         (g.anticipation ?? this.anticipation.get(g.id) ?? 0) + favoriteBoost(g, favorites);
       const best = games.filter((g) => !unavailable(g)).sort((a, b) => rank(b) - rank(a))[0];
       if (!best) continue;
+
+      /*
+       * Nothing is said about a game this process never saw pregame.
+       *
+       * Anticipation only exists while a game is upcoming, so a window that was
+       * already under way at startup has none, and the rating collapses to whatever
+       * the favourite bonus adds. That is how a marquee game went out as "rated 13,
+       * not expected to be much": zero anticipation plus thirteen for two favoured
+       * conferences. Seeding above should mean this never comes up; it stays as the
+       * guarantee that a number nobody can vouch for is never sent.
+       */
+      if (best.anticipation === null && !this.anticipation.has(best.id)) continue;
 
       /*
        * The ball has to be in the air, not merely due.
@@ -224,7 +244,8 @@ export class AlertEngine {
       out.push({
         category,
         game: best,
-        score: rank(best),
+        // Clamped here, where it is read by a person, exactly as the board clamps it.
+        score: Math.min(100, rank(best)),
         alternatives: games.length - 1,
       });
     }
@@ -263,6 +284,18 @@ export class AlertEngine {
             this.sent.add(`${sub.id}:${game.id}:${category}`);
           }
         }
+      }
+      /*
+       * Kickoff windows need seeding too, and used not to.
+       *
+       * While the trigger was the clock, a restart could not re-announce anything:
+       * the five-minute window had long passed. Firing on the game actually being
+       * in progress widened that to two hours, so an update mid-afternoon
+       * announced a window whose games had kicked off before the process started.
+       * Seen live: a kickoff alert nine minutes into the first quarter.
+       */
+      for (const game of snapshot.live) {
+        this.announced.add(`${snapshot.league}:${game.startDate}`);
       }
       console.log(`[notify] seeded ${snapshot.league} from ${snapshot.live.length} live game(s)`);
       return 0;
@@ -340,7 +373,7 @@ function detail(alert: Alert): string {
     // earns its place for the same reason: the board shows it on every row, so a
     // notification without it asks someone to open the app to learn what it knew.
     const line = lineLabel(game);
-    return `${expectation(alert.score)} · rated ${Math.round(alert.score)}${line ? ` · ${line}` : ""}${network}`;
+    return `${expectation(alert.score)} · expected ${Math.round(alert.score)}${line ? ` · ${line}` : ""}${network}`;
   }
   return `${game.away.abbrev} ${game.away.score}, ${game.home.abbrev} ${game.home.score} · ${game.clock} ${quarter(game.period)}${network}`;
 }

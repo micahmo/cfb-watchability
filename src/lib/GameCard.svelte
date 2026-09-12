@@ -121,7 +121,7 @@
          a folded 24-21 with no quarter on it is missing what makes it worth a look.
          This column is empty below the number, so it costs width, not height. -->
     {#if !open && variant === "live"}
-      <div class="score-clock mono" transition:slide={{ duration: ms() }}>{clockText}</div>
+      <div class="score-clock mono">{clockText}</div>
     {/if}
     {#if collapsible}
       <svg class="chev" class:open={expanded} viewBox="0 0 12 8" aria-hidden="true">
@@ -173,6 +173,13 @@
               {/if}
             </div>
           {/if}
+          <!-- Above the tags rather than below them: it belongs with the clock and
+               the situation it describes, and it is also where the expansion grows
+               from, so the new information arrives together instead of appearing on
+               both sides of the labels. -->
+          {#if variant === "live" && game.lastPlay}
+            <p class="last-play">{game.lastPlay}</p>
+          {/if}
         </div>
       {/if}
     {:else if showWp}
@@ -213,8 +220,8 @@
       {/each}
     </div>
 
-    {#if open && variant === "live" && game.lastPlay}
-      <p class="last-play" transition:slide={{ duration: ms() }}>{game.lastPlay}</p>
+    {#if !collapsible && variant === "live" && game.lastPlay}
+      <p class="last-play">{game.lastPlay}</p>
     {/if}
   </div>
 </article>
@@ -259,6 +266,12 @@
   }
   .detail {
     padding-top: 8px;
+    /* Animating height forces layout every frame, so the honest wins are doing it
+       once per card rather than three times and keeping the work inside the card.
+       `contain` stops a card mid-animation from re-laying out its thirteen
+       neighbours, which is what a list of open and closed cards would otherwise
+       cost on each of those frames. */
+    will-change: height;
   }
   @media (prefers-reduced-motion: reduce) {
     .chev,
@@ -286,6 +299,7 @@
   }
   .card {
     position: relative;
+    contain: layout style;
     display: grid;
     grid-template-columns: 6px 68px 1fr;
     gap: 0 16px;
