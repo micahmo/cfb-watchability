@@ -193,10 +193,18 @@ whether the game is a candidate at all.
 Opening one adds the win probability bar, the down and distance, the last play, the network and
 the conference note.
 
-The hero is never foldable. It is the answer to "what should I put on", so hiding its detail defeats
-the point of having it, and there is only ever one of it. Finished games fold on the same mechanism;
-they are capped at twelve by the server rather than thirty-two, but twelve full cards is still more
-than two screens.
+The hero starts open, but it folds like the rest. Starting open is a default, not a restriction, and
+conflating the two produced a card that looked identical to every other card and ignored a tap.
+
+Finished games do not fold at all. Everything folding hides is live-only: the win probability, the
+clock line and the last play are all gated on a game being in progress, so a folded final toggled
+the network chip and nothing else, which is a pointless interaction for about thirty pixels. They
+keep the per-list cap instead, which is where their vertical space actually was, and the client used
+to slice that list to five while the server sent twelve, leaving seven unreachable.
+
+The network never folds either, on any card. Where to watch a game is not the bulky part, and hiding
+it is exactly backwards on the card you are deciding whether to switch to. It costs a wrapped tag row
+on a card carrying two long tags, which is the right trade.
 
 ## Verifying the model against real games
 

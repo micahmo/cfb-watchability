@@ -27,11 +27,21 @@
    */
   const MAX_CARDS = 6;
 
-  /** Cards the viewer has opened, by game id. Survives a poll; the list re-renders. */
+  /**
+   * Cards the viewer has explicitly opened or closed, by game id. Survives a poll,
+   * since only the list around it re-renders.
+   *
+   * Absent means "whatever this card's default is", which is why both helpers take
+   * that default. The hero starts open and everything else starts folded, but
+   * starting open is a default rather than a restriction: a card that looks like
+   * every other card and ignores a tap is just a dead target.
+   */
   let openCards = $state<Record<string, boolean>>({});
   let showAllLive = $state(false);
   let showAllRecent = $state(false);
-  const toggleCard = (id: string) => (openCards[id] = !openCards[id]);
+  const cardOpen = (id: string, fallback: boolean) => openCards[id] ?? fallback;
+  const toggleCard = (id: string, fallback: boolean) =>
+    (openCards[id] = !cardOpen(id, fallback));
 
   /** Day keys the user has expanded past MAX_PER_DAY. */
   let expanded = $state<Record<string, boolean>>({});
@@ -306,7 +316,13 @@
         {heroLabel}
       </span>
     </div>
-    <GameCard game={top} score={scoreOf(top)} />
+    <GameCard
+      game={top}
+      score={scoreOf(top)}
+      collapsible
+      expanded={cardOpen(top.id, true)}
+      ontoggle={() => toggleCard(top.id, true)}
+    />
   </section>
 {/if}
 
@@ -322,8 +338,8 @@
           {game}
           score={scoreOf(game)}
           collapsible
-          expanded={openCards[game.id] === true}
-          ontoggle={() => toggleCard(game.id)}
+          expanded={cardOpen(game.id, false)}
+          ontoggle={() => toggleCard(game.id, false)}
         />
       {/each}
     </div>
@@ -407,14 +423,12 @@
       <h2 class="section-head">Just finished, best first</h2>
       <div class="stack">
         {#each showAllRecent ? recent : recent.slice(0, MAX_CARDS) as game (game.id)}
-          <GameCard
-            {game}
-            score={scoreOf(game)}
-            variant="final"
-            collapsible
-            expanded={openCards[game.id] === true}
-            ontoggle={() => toggleCard(game.id)}
-          />
+          <!-- Not collapsible. Everything a folded card hides is live-only: the win
+               probability, the clock line and the last play are all gated on the
+               game being in progress, so folding a final toggled the network chip
+               and nothing else. The list still caps at MAX_CARDS, which is where
+               the vertical space actually was. -->
+          <GameCard {game} score={scoreOf(game)} variant="final" />
         {/each}
       </div>
       {#if recent.length > MAX_CARDS}

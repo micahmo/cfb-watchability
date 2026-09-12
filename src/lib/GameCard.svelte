@@ -156,8 +156,8 @@
     <!-- Labels: how to watch it, and what kind of game it is. -->
     <div class="chips">
       {#if variant === "final"}<span class="final-chip">FINAL</span>{/if}
-      {#if open && game.broadcast}<span class="channel-chip">{game.broadcast}</span>{/if}
-      {#if open && !game.nationalBroadcast}<span class="note warn">local feed</span>{/if}
+      {#if game.broadcast}<span class="channel-chip">{game.broadcast}</span>{/if}
+      {#if !game.nationalBroadcast}<span class="note warn">local feed</span>{/if}
       <!-- Only shown once a postal code makes the answer real. Before that every
            1:00 game is equally "regional", which is noise rather than a signal. -->
       <!-- Only the exclusion. The channel chip already says CBS or FOX, and the
