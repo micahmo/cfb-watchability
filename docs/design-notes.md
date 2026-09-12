@@ -47,6 +47,42 @@ market = clamp((expectedDeficit - actualDeficit) / 21) * (0.4 + 0.6 * progress)
 upset  = line ? max(market, 0.6 * rankUpset) : rankUpset
 ```
 
+### The line decides when there is one, and rank only stands in when there is not
+
+`combinedUpset` took the higher of the market reading and the rank reading, which let the cruder
+signal override the better-informed one. Unranked Michigan leading eleventh-ranked Oklahoma 7-0 in
+the second quarter rated **0.26** on the closing line, correctly unremarkable for a 5.5-point
+underdog, and **0.61** on rank alone, which knows only "unranked versus eleventh". Even at the sixty
+per cent ceiling that cleared the alert bar, so a game the market had called nearly even announced
+itself as an upset.
+
+Rank is already inside the line. A poll gap the market has priced at five and a half points is not a
+surprise waiting to happen, it is a poll lagging, and consulting rank after the line has spoken
+counts the same fact twice. So the line decides where it exists and rank stands in only where it
+does not, which is what the market section above already claimed was the point of using it.
+
+### The weight belongs on improbability, not on elapsed time
+
+Even with the line deciding, alerts still fired in the first half of games that were merely going
+the underdog's way. The lateness weight had a floor of 0.4, so a lead was worth nearly half its
+eventual credit from the opening snap.
+
+The floor is now 0.15 and `MAX_VS_LINE` tightened from 21 to 17. The two move together and the net
+effect is to shift weight off *how long* a team has been ahead and onto *how improbable* it is that
+they are. Measured on a live slate:
+
+| | before | after |
+| --- | --- | --- |
+| 6.5-point dog up 10, second quarter | 0.37 alert | 0.34 quiet |
+| 5.5-point dog up 7, second quarter | 0.36 alert | 0.23 quiet |
+| 28.5-point dog up 6, second quarter | 0.54 alert | 0.49 alert |
+| 24.5-point dog tied at half | 0.40 alert | 0.40 alert |
+
+The 24.5-point one rising slightly while the 6.5-point one falls is the whole point: the surprise is
+doing the work rather than the clock. **Fitted to five live games, though**, which is a handful and
+not a calibration set. The direction is principled and the constants are not yet earned; they want
+checking against a season of in-game states the way the shootout thresholds were.
+
 ### The expectation has to be pro-rated, or every game opens as an upset
 
 `expectedDeficit` started as the whole spread, compared against the score as it stood. That makes

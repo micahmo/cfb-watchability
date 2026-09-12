@@ -296,7 +296,7 @@ export function marketUpsetScore(
   const expectedDeficit = fullGameSpread * progress;
   const vsLine = expectedDeficit - (favorite.score - underdog.score);
   if (vsLine <= 0) return 0;
-  return clamp(vsLine / MAX_VS_LINE) * (0.4 + 0.6 * progress);
+  return clamp(vsLine / MAX_VS_LINE) * (LATENESS_FLOOR + (1 - LATENESS_FLOOR) * progress);
 }
 
 export interface ScoreInputs {
@@ -320,16 +320,30 @@ export interface ScoreInputs {
   isFinal?: boolean;
 }
 
+/**
+ * Surprise, from the closing line where there is one and from rank or record where
+ * there is not.
+ *
+ * The two are alternatives, not a maximum of each other. Taking the higher let the
+ * cruder signal override the better-informed one: unranked Michigan leading #11
+ * Oklahoma 7-0 in the second quarter rated 0.26 on the line, which is correctly
+ * unremarkable for a 5.5-point underdog, and 0.61 on rank alone, which only knows
+ * "unranked versus eleventh". Even at sixty per cent that cleared the alert bar, so
+ * a game the market had called nearly even was announced as an upset.
+ *
+ * Rank is already inside the line. A poll gap the market has priced at five and a
+ * half points is not a surprise waiting to happen, it is a poll lagging, and
+ * consulting rank again after the line has spoken counts the same fact twice. So
+ * the line decides when it exists, and rank stands in only when it does not.
+ */
 function combinedUpset(input: ScoreInputs, progress: number): number {
-  // College ranks by poll, the NFL by record. Either way this is the narrative
-  // fallback, and the market drives the magnitude when a line exists.
-  const narrative =
-    input.league === "nfl"
-      ? recordUpsetScore(input.home, input.away, progress)
-      : upsetScore(input.home, input.away, progress);
-  if (input.homeSpread === null) return narrative;
-  const market = marketUpsetScore(input.homeSpread, input.home, input.away, progress);
-  return Math.max(market, RANK_ONLY_CEILING * narrative);
+  if (input.homeSpread !== null) {
+    return marketUpsetScore(input.homeSpread, input.home, input.away, progress);
+  }
+  // College ranks by poll, the NFL by record.
+  return input.league === "nfl"
+    ? recordUpsetScore(input.home, input.away, progress)
+    : upsetScore(input.home, input.away, progress);
 }
 
 /**
@@ -497,15 +511,27 @@ const ONE_SCORE = 8;
  */
 const SHOOTOUT_TOTAL: Record<League, number> = { cfb: 65, nfl: 61 };
 
-/** Beating the closing line by three touchdowns is a maximal upset. */
-const MAX_VS_LINE = 21;
 /**
- * Rank alone can only carry the term this far. An unranked team beating a ranked
- * one is a genuine story even when the market called it a coin flip, but it is not
- * the same event as a 27-point underdog hanging around, and only the closing line
- * can tell those apart.
+ * How far ahead of the line's pace counts as a maximal surprise.
+ *
+ * Seventeen rather than twenty-one, paired with the lateness floor below. The two
+ * move together and shift weight off *how long* a team has been ahead and onto
+ * *how improbable* it is that they are: a 28.5-point underdog leading is worth
+ * saying in the second quarter, and a 6.5-point underdog leading by ten is a
+ * football game whenever it happens.
  */
-const RANK_ONLY_CEILING = 0.6;
+const MAX_VS_LINE = 17;
+/**
+ * What the lateness weight is worth at kickoff.
+ *
+ * Was 0.4, which gave an early lead nearly half its eventual credit and produced
+ * upset alerts in the first half of games that were merely going the underdog's
+ * way: a 6.5-point dog up ten in the second quarter rated 0.37 and announced
+ * itself. At 0.15 the same game rates 0.34 and stays quiet, while a 24.5-point dog
+ * tied at half rises slightly, to 0.40, because the surprise is doing the work
+ * rather than the clock.
+ */
+const LATENESS_FLOOR = 0.15;
 /** Roughly the start of the fourth quarter. */
 const LATE_GAME_PROGRESS = 0.75;
 
