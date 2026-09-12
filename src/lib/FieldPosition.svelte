@@ -76,8 +76,12 @@
    * being attacked.
    */
   const GAP = 3.4;
-  const HEAD_LEN = 2.2;
-  const HEAD_HALF = 1.3;
+  /* Sized for a filled triangle, which carries less visual weight than the stroked
+     chevron it replaced, so the same numbers came out looking tiny. Length a little
+     over one and a half times the half-height reads as an arrowhead rather than a
+     dot; taller than this and it was the original complaint again. */
+  const HEAD_LEN = 3.2;
+  const HEAD_HALF = 2;
   /** Shortest line worth drawing. Below this the arrow is a caret and nothing else. */
   const MIN_TAIL = 2.5;
 
