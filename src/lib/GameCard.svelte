@@ -40,7 +40,16 @@
    * while the content behind it was 97px. `slide` measures the real height and
    * animates to it, which is the thing that has to be right.
    */
-  const MOTION_MS = 200;
+  /*
+   * Three hundred rather than two.
+   *
+   * It does not make the animation cheaper, and the cost is the point: each frame
+   * relays out and repaints the cards on screen, and dropping some of them is what
+   * reads as stutter. Spreading the same dropped frames across half again as many
+   * makes each one a smaller fraction of the movement. Purely perceptual, and the
+   * real fix is to stop animating a layout property at all.
+   */
+  const MOTION_MS = 300;
   /* Asked at the moment a transition starts rather than when the card is built,
      so turning the setting on takes effect without a reload. */
   const ms = () =>
