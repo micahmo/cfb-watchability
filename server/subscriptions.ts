@@ -58,6 +58,32 @@ const FILE = "notifications.json";
 const DEAD_AFTER_MS = 30 * 24 * 60 * 60 * 1000;
 
 /**
+ * How many subscriptions the store will hold.
+ *
+ * The endpoint is the only identity a subscriber has, and it is whatever the
+ * caller says it is: any HTTPS URL under a kilobyte. So one client can mint as
+ * many distinct records as it likes, and each one costs a full rewrite of the
+ * store on every push it receives. Measured before the cap: 6,600 records
+ * accepted from a single client in fifty seconds, a 4.85 MB file, and a
+ * per-request cost that had already grown fifteenfold by the end of the run.
+ *
+ * Far above any real use of a board with a handful of viewers, and far below the
+ * point where rewriting the file hurts.
+ */
+const MAX_SUBSCRIPTIONS = 500;
+
+/**
+ * How long timestamp-only updates are allowed to sit in memory before a write.
+ *
+ * `lastPushAt` and `lastAckAt` move on every push and every acknowledgement,
+ * which on a busy slate is hundreds of writes of the whole file for information
+ * that is a few seconds stale by definition. Adding or removing a subscription
+ * still writes immediately, because losing one of those to a restart would
+ * silently unsubscribe somebody; losing a timestamp costs nothing.
+ */
+const TOUCH_DEBOUNCE_MS = 2000;
+
+/**
  * Subscriptions and the VAPID keypair, on disk.
  *
  * A JSON file rather than a database: this is a handful of records written when
@@ -69,6 +95,7 @@ const DEAD_AFTER_MS = 30 * 24 * 60 * 60 * 1000;
  */
 export class SubscriptionStore {
   private data: Stored | null = null;
+  private touchTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly dir: string | undefined;
   readonly durability: Durability;
 
@@ -139,6 +166,10 @@ export class SubscriptionStore {
   }
 
   private persist(data: Stored = this.data as Stored): void {
+    if (this.touchTimer !== null) {
+      clearTimeout(this.touchTimer);
+      this.touchTimer = null;
+    }
     try {
       fs.writeFileSync(this.file, JSON.stringify(data, null, 2));
     } catch (err) {
@@ -146,10 +177,30 @@ export class SubscriptionStore {
     }
   }
 
+  /** Coalesces the timestamp churn that a slate of pushes would otherwise write one file at a time. */
+  private touch(): void {
+    if (this.touchTimer !== null) return;
+    this.touchTimer = setTimeout(() => {
+      this.touchTimer = null;
+      this.persist();
+    }, TOUCH_DEBOUNCE_MS);
+    this.touchTimer.unref?.();
+  }
+
   /** Adds or replaces by endpoint, so re-subscribing updates rather than duplicates. */
   upsert(input: Omit<Subscription, "id" | "createdAt" | "lastPushAt" | "lastAckAt">): Subscription | null {
     if (this.data === null) return null;
     const existing = this.data.subscriptions.find((s) => s.endpoint === input.endpoint);
+    /*
+     * A new endpoint is refused once the store is full; a known one is always
+     * updated. Refusing rather than evicting is the point: eviction would let a
+     * caller that can mint endpoints at will push every real subscriber out of
+     * the store, which is a worse outcome than turning down the 501st.
+     */
+    if (existing === undefined && this.data.subscriptions.length >= MAX_SUBSCRIPTIONS) {
+      console.error(`[notify] refused a subscription, store is full at ${MAX_SUBSCRIPTIONS}`);
+      return null;
+    }
     const now = new Date().toISOString();
     const record: Subscription = {
       id: existing?.id ?? crypto.randomUUID(),
@@ -180,7 +231,7 @@ export class SubscriptionStore {
     const sub = this.data.subscriptions.find((s) => s.endpoint === endpoint);
     if (sub === undefined) return;
     sub.lastAckAt = new Date().toISOString();
-    this.persist();
+    this.touch();
   }
 
   /**
@@ -223,7 +274,7 @@ export class SubscriptionStore {
       // received it. Recorded so the gap is only ever measured against pushes a
       // live worker actually had the chance to acknowledge.
       sub.lastPushAt = new Date().toISOString();
-      this.persist();
+      this.touch();
     } catch (err) {
       const status = (err as { statusCode?: number }).statusCode;
       if (status === 404 || status === 410) {

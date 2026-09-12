@@ -462,7 +462,12 @@ async function handleNotificationWrite(
     json(res, { error: "invalid subscription" }, 400);
     return;
   }
-  subscriptions.upsert(parsed);
+  // Null means the store refused it, which at this point only happens when it is
+  // full. Saying so beats reporting a success the viewer will never hear from.
+  if (subscriptions.upsert(parsed) === null) {
+    json(res, { error: "too many subscriptions" }, 503);
+    return;
+  }
   json(res, { ok: true });
 }
 
