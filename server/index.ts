@@ -4,6 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { LeaguePoller } from "./poller.js";
 import { StandingsStore } from "./standings.js";
+import { History } from "./history.js";
 import { ListingsStore } from "./listings.js";
 import { SubscriptionStore, CATEGORIES, type Category } from "./subscriptions.js";
 import { AlertEngine } from "./alerts.js";
@@ -60,6 +61,11 @@ function startSubscriptions(): SubscriptionStore {
 }
 
 const subscriptions = startSubscriptions();
+/**
+ * Shares the notification directory, which is the one path guaranteed to be a
+ * real mount rather than container-local scratch.
+ */
+const history = new History(process.env.NOTIFY_DIR);
 const alerts = new AlertEngine(subscriptions);
 
 /** Each league polls independently, so a quiet NFL week cannot slow a busy Saturday. */
@@ -166,6 +172,7 @@ function fanOut(snapshot: Snapshot): void {
  */
 function onSnapshot(snapshot: Snapshot): void {
   fanOut(snapshot);
+  history.record(snapshot);
   if (!subscriptions.available) return;
   void alerts
     .evaluate(snapshot, async (sub) =>
