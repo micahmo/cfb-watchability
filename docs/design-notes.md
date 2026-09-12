@@ -309,15 +309,20 @@ composited and cheap, size changes driven by layout are not. A native app pushin
 by animating a height would stutter the same way. What the web lacks is a transition to
 `height: auto`, which is why the height is set from script frame by frame.
 
-Two things chase it, and only the first is cheap. `content-visibility: auto` on cards and rows lets
-the browser skip layout for anything off screen, which is most of what was being measured each
-frame; `contain-intrinsic-size: auto` goes with it so each element remembers its last rendered
-height rather than collapsing to a placeholder and lurching the scrollbar. The second is a FLIP
-rewrite: set the final height in one layout, then animate `transform: translateY` on everything
-below from the offset back to zero, which is composited and costs nothing per frame however long the
-list. That is what a polished native implementation would do and it is real work here, because the
-board re-renders from the push feed every few seconds and a re-render landing mid-animation would
-swap nodes carrying inline transforms.
+`content-visibility: auto` was tried first, being cheap: it lets the browser skip layout for anything
+off screen, with `contain-intrinsic-size: auto` so each element remembers its last rendered height
+rather than collapsing to a placeholder and lurching the scrollbar. **It made no observable
+difference**, which is itself informative. Off-screen work was not the cost, so the expense is in
+the handful of cards actually visible, and at that size it is as likely to be repaint as layout:
+each frame shifts cards carrying an SVG field, a probability bar and shadows, and all of it has to
+be rasterised again. It stays in because skipping invisible work is right regardless, but it is not
+the fix.
+
+That leaves the FLIP rewrite: set the final height in one layout, then animate `transform:
+translateY` on everything below from the offset back to zero. Transforms are composited, so it
+avoids repaint as well as layout, which matters more now that repaint is the suspect. It is real
+work here because the board re-renders from the push feed every few seconds, and a re-render landing
+mid-animation would swap nodes carrying inline transforms.
 
 Worth recording what was **not** the cause, since both were plausible and both were tested. The
 per-second clock tick re-runs a label on every planning row, and the row calls `toLocaleTimeString`,

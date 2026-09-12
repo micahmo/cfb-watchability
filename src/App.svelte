@@ -645,13 +645,21 @@
     width: 100%;
     background: none;
     border: none;
-    border-top: 1px solid var(--border);
     color: var(--text-dim);
     font: inherit;
     font-size: 12px;
     font-weight: 600;
     padding: 9px 0;
     cursor: pointer;
+  }
+  /*
+   * The rule belongs only inside the planning panel, where the button sits
+   * directly beneath the rows and the line divides them. Under a stack of live or
+   * finished cards there is a gap either side of it, so a full-width border floats
+   * in empty space and reads as a stray horizontal rule rather than a divider.
+   */
+  .day-group .show-all {
+    border-top: 1px solid var(--border);
   }
   @media (hover: hover) {
     .show-all:hover {
