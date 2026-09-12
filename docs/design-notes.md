@@ -661,6 +661,27 @@ flight, since at startup the socket connects mid-poll and both would fetch the s
 Measured on a quiet night: `push(5)` and `push(1)` rebuilds arriving between polls, and a client
 holding a stream open received four boards in a hundred seconds, two of them seven seconds apart.
 
+### A push must not carry the whole board
+
+The first version sent the entire snapshot on every push, which measured 223KB, of which 215KB was
+the planning list. Seventy-five seconds of watching a board with nothing live cost 900KB, and the
+ceiling with a full slate and a one-second window was around 13MB per client per minute. That is a
+lot of bytes to move eight kilobytes of scores.
+
+So a push leaves the planning list out when it has not changed, and the client keeps the one it
+already has. It is compared rather than assumed, which matters: when a game kicks off it leaves the
+list, the comparison fails, and the new list goes out. Omitting it blindly would have shown that game
+as live and upcoming at once until the next poll. The field is omitted rather than emptied, since an
+empty array would read as "every upcoming game is gone".
+
+Measured after: 120KB on connect, 8KB per push, and a frame in between that correctly resent the list
+at 223KB when the schedule poll grew it from 80 games to 155.
+
+The coalescing window stayed at one second. The bandwidth problem was caused by sending the wrong
+data, not by sending it too often, and making every viewer's board staler would have been treating
+the symptom. If volume is still a problem on a full slate, the next lever is sending only the games
+that changed, not slowing down the ones that did.
+
 ### What the numbers actually are
 
 The client polled every 20 seconds and the server every 30, so worst case a score was 50 seconds old.

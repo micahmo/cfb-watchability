@@ -22,13 +22,20 @@ export function openBoardStream(
   league: League,
   zip: string | null,
   marketOff: boolean,
-  onSnapshot: (snapshot: Snapshot) => void,
+  onSnapshot: (apply: (previous: Snapshot | null) => Snapshot) => void,
 ): () => void {
   if (typeof EventSource === "undefined") return () => undefined;
   const source = new EventSource(`/api/stream?${boardQuery(league, zip, marketOff)}`);
   source.addEventListener("snapshot", (event) => {
     try {
-      onSnapshot(JSON.parse((event as MessageEvent).data) as Snapshot);
+      const pushed = JSON.parse((event as MessageEvent).data) as Partial<Snapshot>;
+      // The planning list is left out when it has not changed, so the caller is
+      // handed a merge rather than a board: applying the frame on its own would
+      // blank a list the server deliberately did not resend.
+      onSnapshot((previous) => ({
+        ...(pushed as Snapshot),
+        upcoming: pushed.upcoming ?? previous?.upcoming ?? [],
+      }));
     } catch {
       // A malformed frame changes nothing; the next one, or the poll, corrects it.
     }

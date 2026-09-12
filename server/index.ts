@@ -114,6 +114,17 @@ function resolveView(viewer: Viewer, base: Snapshot): Promise<Snapshot> {
 interface Stream {
   viewer: Viewer;
   res: http.ServerResponse;
+  /**
+   * The planning list this connection was last sent, serialised.
+   *
+   * Kept so an unchanged list can be left out of a push. It is most of the board
+   * by size and changes only when the schedule poll runs or a game changes state,
+   * so sending it on every clock tick meant a 223KB frame to move 8KB of scores.
+   * Compared rather than assumed: when a game does leave the list the comparison
+   * fails and the new list goes out, which is what stops a game that just kicked
+   * off appearing as both live and upcoming until the next poll.
+   */
+  sentUpcoming: string | null;
 }
 const streams = new Set<Stream>();
 
@@ -127,7 +138,17 @@ function sendSnapshot(stream: Stream, base: Snapshot): void {
     // noticed from what is being served rather than from a connection dropping.
     // A reconnect is evidence of a restart, not proof of one: a sleeping phone or
     // a tunnel blip reconnects with nothing deployed.
-    const payload = JSON.stringify({ ...snapshot, build: BUILD });
+    const upcoming = JSON.stringify(snapshot.upcoming);
+    const unchanged = upcoming === stream.sentUpcoming;
+    stream.sentUpcoming = upcoming;
+
+    const payload = JSON.stringify({
+      ...snapshot,
+      // Omitted, not emptied: the client keeps the list it already has, and an
+      // empty array would read as "every upcoming game is gone".
+      upcoming: unchanged ? undefined : snapshot.upcoming,
+      build: BUILD,
+    });
     stream.res.write(`event: snapshot\ndata: ${payload}\n\n`);
   });
 }
@@ -502,7 +523,7 @@ function handleRequest(req: http.IncomingMessage, res: http.ServerResponse): voi
       "access-control-allow-origin": "*",
     });
 
-    const stream: Stream = { viewer, res };
+    const stream: Stream = { viewer, res, sentUpcoming: null };
     streams.add(stream);
     // The current board immediately, so a fresh connection is never blank while
     // it waits for whatever happens next.

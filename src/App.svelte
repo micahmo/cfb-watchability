@@ -106,7 +106,8 @@
        proxy that buffers event streams, or a browser without EventSource, costs
        freshness rather than the board, and the poll is also what repairs a stream
        that reconnected having missed something. */
-    const stop = openBoardStream(league, prefs.zip, prefs.marketOff, (next) => {
+    const stop = openBoardStream(league, prefs.zip, prefs.marketOff, (apply) => {
+      const next = apply(snapshot);
       if (next.league !== prefs.league) return;
       snapshot = next;
       loadError = null;
