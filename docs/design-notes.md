@@ -343,6 +343,17 @@ So the live cards fold. Folded is 80 to 100px depending on how many tags a game 
 six show before an expander, the same number a day of the planning list shows and for the same
 reason: the list is ranked, so the tail is the part nobody would switch to.
 
+The chips row is not gated at all. The conference note was held back for a while on the reasoning
+that it would be wallpaper, and that reasoning is sound on its own terms, since conference games run
+about 13% of a September slate and 90% of a November one. It was still wrong, because every other
+chip in that row already shows when folded and the row already wraps for multiple tags, so it was an
+exception with no rule behind it. The better argument for leaving it out was never the wallpaper one:
+`stakesScore` already folds conference play into the rating, so the chip explains the number rather
+than adding to it. That is an argument for *ordering* chips, not for hiding one of them.
+
+It costs a wrapped chip row on some cards, and in conference season that will be most of them. A rule
+with an arbitrary exception is worse than a slightly taller card.
+
 What stays visible when folded is the part that decides whether to look closer: teams, records,
 the closing line, possession, score, the tags, and the clock. **The clock is the argument.** Close
 and late is the question this board answers and lateness is the dominant term in the rating, so a

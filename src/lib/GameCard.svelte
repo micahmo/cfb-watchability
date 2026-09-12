@@ -227,7 +227,10 @@
            grid's call signs span neighbouring markets whose affiliates this viewer
            cannot receive, so naming them was noise at best and wrong at worst. -->
       {#if unavailable}<span class="note">not on your channels</span>{/if}
-      {#if open && game.conferenceGame}<span class="note">conference game</span>{/if}
+      <!-- Not gated on being open. Every other chip in this row shows when folded,
+           and the row already wraps for multiple tags, so holding this one back was
+           an exception with no rule behind it. -->
+      {#if game.conferenceGame}<span class="note">conference game</span>{/if}
       {#each game.tags as tag (tag)}
         <span class="tag" class:hot={HOT_TAGS.has(tag)}>{tag}</span>
       {/each}
