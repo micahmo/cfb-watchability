@@ -612,11 +612,40 @@ export function buildTags(game: Game, breakdown: ScoreBreakdown): string[] {
   // claimed a specific story the condition does not actually require.
   const onTheLine = !isFinal && breakdown.clutch >= 0.6;
 
+  const underdog = underdogView(game);
+  /* A game with no line falls back to the rank gap, which carries its own notion
+     of a mismatch, so the floor only applies where a line exists to measure. */
+  const realUnderdog =
+    game.pregameSpread === null || Math.abs(game.pregameSpread) >= UPSET_MIN_SPREAD;
+
+  /**
+   * Something happened, beyond the game being close between teams people know.
+   *
+   * A total on its own is not evidence of a classic. Closeness and prominence
+   * carry 0.76 of the weighting between them, so two known teams and a small
+   * final margin clear 80 with nothing else present at all. Utah State losing
+   * 14-16 to Washington scored 82.5 and took the label: 55 of those points were
+   * the final margin being two, and `pace` correctly read the thirty total
+   * points as 0.000 but carries 0.04 and could not argue.
+   *
+   * `tensionFromFinalMargin` sees a margin and nothing else, so four field goals
+   * and a 45-43 shootout are indistinguishable to it. These four conditions are
+   * the ones that are not: extra time, a game that actually produced points, an
+   * endgame still on the line, and a real underdog who won. Deliberately not
+   * `swing`, which measures win-probability movement and is therefore largest in
+   * exactly the low-scoring close games this is meant to screen out.
+   */
+  const dramatic =
+    game.period > 4 ||
+    breakdown.pace >= 0.5 ||
+    onTheLine ||
+    (isFinal && underdog !== null && realUnderdog && underdog.levelOrAhead && breakdown.upset >= 0.35);
+
   /* How many overtimes, not merely that there were some. A double overtime is a
      different event from a single one, and the recap is read afterwards, when
      "2OT" is most of what anybody wants to know about the game. */
   if (game.period > 4) tags.push(game.period === 5 ? "OVERTIME" : `${game.period - 4}OT`);
-  if (breakdown.total >= 80) tags.push("INSTANT CLASSIC");
+  if (breakdown.total >= 80 && dramatic) tags.push("INSTANT CLASSIC");
   if (onTheLine) tags.push("GAME ON THE LINE");
 
   if (isFinal) {
@@ -626,11 +655,6 @@ export function buildTags(game: Game, breakdown: ScoreBreakdown): string[] {
     // say nearly the same thing twice.
     tags.push("ONE SCORE, LATE");
   }
-  const underdog = underdogView(game);
-  /* A game with no line falls back to the rank gap, which carries its own notion
-     of a mismatch, so the floor only applies where a line exists to measure. */
-  const realUnderdog =
-    game.pregameSpread === null || Math.abs(game.pregameSpread) >= UPSET_MIN_SPREAD;
   // Magnitude is carried by `breakdown.upset` itself, which already blends the
   // closing line with the rank gap, so no separate gap gate is needed here.
   if (underdog !== null && realUnderdog) {
