@@ -228,7 +228,19 @@ game. Auditing the rest of the tags for it found no others, and the reason is a 
 normalised term off the breakdown. `totalPoints` was the only raw accumulating value in a gate.
 
 The fix compares against the **projected** total, which blends the pregame expectation with what has
-actually happened, weighted by how much game has been played. A finished game is simply its own
+actually happened, weighted by the square of how much game has been played.
+
+The square is not decoration, and the first version without it was wrong in a new way. `total /
+progress` is a linear extrapolation and it is violent early: Weber State at Colorado sat 14-7 seven
+minutes into the first quarter, an unremarkable score, and twenty-one points at 13% of a game implies
+a hundred and sixty. Weighted linearly that pulled the projection to 68.8 and called it a shootout,
+so fixing "an ordinary total passes a fixed bar by finishing" had introduced "any fast start is a
+shootout". Squaring the weight makes early evidence count for almost nothing and lets it take over as
+the game actually happens.
+
+It leaves finished games untouched, since the weight is one at full time either way. Re-run against
+the same 315 finals afterwards: 7.3%, identical to the figure below. Only the live path moved, which
+is the only place the fault was. A finished game is simply its own
 final score, and a game that has put up 52 points by halftime projects past a hundred and is a
 shootout on the spot, which is the case the old absolute rule and a naive "raise the number" fix
 both get wrong.

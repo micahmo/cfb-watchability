@@ -248,7 +248,22 @@ export function projectedTotal(
   const prior = overUnder ?? typical;
   if (progress < 0.08) return prior;
   const observed = totalPoints / progress;
-  return prior * (1 - progress) + observed * progress;
+  /*
+   * Weighted by progress *squared*, not progress.
+   *
+   * `total / progress` is a linear extrapolation and it is violent early: Weber
+   * State at Colorado sat 14-7 seven minutes into the first quarter, an ordinary
+   * score, and twenty-one points at 13% of the game implies a hundred and sixty.
+   * Weighted linearly that dragged the projection to 68.8 and called it a shootout.
+   * Squaring makes early evidence count for almost nothing and lets it take over as
+   * the game actually happens.
+   *
+   * It leaves finished games exactly where they were, since the weight is one at
+   * full time either way, so the thresholds calibrated against 315 finals still
+   * hold. Only the live path changes, which is the only place the fault was.
+   */
+  const trust = progress * progress;
+  return prior * (1 - trust) + observed * trust;
 }
 
 export function paceScore(
