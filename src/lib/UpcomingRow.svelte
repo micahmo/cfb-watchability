@@ -61,6 +61,10 @@
 
 <style>
   .row {
+    /* Same reasoning as the cards: a planning list can run to seventy rows, and
+       none of the off-screen ones need laying out while a card above animates. */
+    content-visibility: auto;
+    contain-intrinsic-size: auto 57px;
     display: flex;
     align-items: center;
     gap: 12px;

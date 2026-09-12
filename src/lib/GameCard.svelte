@@ -304,6 +304,21 @@
   .card {
     position: relative;
     contain: layout style;
+    /*
+     * Off-screen cards are skipped entirely rather than laid out.
+     *
+     * Expanding a card animates its height, and height is a layout property, so
+     * every frame repositions everything below it: on a full Saturday that is
+     * seventeen more live cards, the planning list and the recap, most of which
+     * are nowhere near the screen. This tells the browser not to bother with the
+     * ones it is not showing.
+     *
+     * `auto` on the intrinsic size matters: the browser then remembers each card's
+     * last rendered height instead of collapsing it to the placeholder, so the
+     * scrollbar does not lurch as cards enter and leave.
+     */
+    content-visibility: auto;
+    contain-intrinsic-size: auto 110px;
     display: grid;
     grid-template-columns: 6px 68px 1fr;
     gap: 0 16px;

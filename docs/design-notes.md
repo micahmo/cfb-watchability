@@ -297,6 +297,36 @@ The day boundary used for the cap is the server's, and the one used for grouping
 They agree whenever the two share a timezone; where they do not, a game near midnight counts
 against the neighbouring day's budget, which at this size trims nothing.
 
+## What the expand animation actually costs
+
+Animating height is a layout operation, so every frame repositions the card *and* everything under
+it. On a full Saturday that is seventeen more live cards, a planning list of up to seventy rows and
+the recap: roughly a hundred elements laid out twelve times in two hundred milliseconds. That, not
+the animation itself, is where the stutter comes from.
+
+**It is not a web limitation.** Native frameworks draw the same line: transform and opacity are
+composited and cheap, size changes driven by layout are not. A native app pushing a long list down
+by animating a height would stutter the same way. What the web lacks is a transition to
+`height: auto`, which is why the height is set from script frame by frame.
+
+Two things chase it, and only the first is cheap. `content-visibility: auto` on cards and rows lets
+the browser skip layout for anything off screen, which is most of what was being measured each
+frame; `contain-intrinsic-size: auto` goes with it so each element remembers its last rendered
+height rather than collapsing to a placeholder and lurching the scrollbar. The second is a FLIP
+rewrite: set the final height in one layout, then animate `transform: translateY` on everything
+below from the offset back to zero, which is composited and costs nothing per frame however long the
+list. That is what a polished native implementation would do and it is real work here, because the
+board re-renders from the push feed every few seconds and a re-render landing mid-animation would
+swap nodes carrying inline transforms.
+
+Worth recording what was **not** the cause, since both were plausible and both were tested. The
+per-second clock tick re-runs a label on every planning row, and the row calls `toLocaleTimeString`,
+which is slow: measured at 0.037ms a call, 0.75ms a second as the board normally sits, 5.3ms with
+the planning list fully expanded. Real waste, but a third of one frame once a second cannot make a
+two-hundred-millisecond animation stutter. And a push landing mid-animation was ruled out from the
+other end: the "updated" counter was seen ticking up in seconds throughout a stuttering expand, so
+no snapshot arrived during it at all.
+
 ## The live list has to fold
 
 Every live game renders, and nothing capped that. Measured on a 375-wide phone, a live card is
