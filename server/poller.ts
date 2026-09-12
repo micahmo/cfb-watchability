@@ -462,12 +462,11 @@ export class LeaguePoller {
     this.polling = true;
     this.lastPollAt = Date.now();
     try {
-      const { games, season, week, events } = await fetchScoreboard({
+      const { season, week, events } = await fetchScoreboard({
         league: this.league,
         groups: GROUPS,
         dates: DATES ?? liveDateRange(),
       });
-      await this.enrich?.(games);
       const now = Date.now();
 
       /*
@@ -503,6 +502,19 @@ export class LeaguePoller {
       }
       this.season = season;
       this.week = week;
+
+      /*
+       * Normalised back out of the merged map, not out of the fetch.
+       *
+       * Composing from `events` undid the guard for a frame. The held document
+       * was kept as the base the next push would build on, so the rewind no
+       * longer stuck, but the board still published the stale REST view until
+       * that push landed a second or two later. Reading back through the map
+       * means the poll scores exactly the documents it decided to keep, and the
+       * two paths into `compose` start from the same place.
+       */
+      const games = normalizeEvents([...this.rawEvents.values()], this.league);
+      await this.enrich?.(games);
 
       // Capture every line we see while a game is still pregame; the scoreboard
       // stops carrying odds the moment it kicks off.
