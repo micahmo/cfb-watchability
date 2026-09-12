@@ -228,20 +228,28 @@ export class LeaguePoller {
     if (this.patchTimer !== null) return;
     this.patchTimer = setTimeout(() => {
       this.patchTimer = null;
-      this.rebuildFromPatches();
+      void this.rebuildFromPatches();
     }, PATCH_COALESCE_MS);
     this.patchTimer.unref?.();
   }
 
   /** Re-normalises the patched documents and rescores, with no network at all. */
-  private rebuildFromPatches(): void {
+  private async rebuildFromPatches(): Promise<void> {
     const count = this.patchesApplied;
     this.patchesApplied = 0;
     try {
       const games = normalizeEvents([...this.rawEvents.values()], this.league);
-      // Enrichment is a cached lookup, so this stays local; the standings refresh
-      // it might trigger is owned by the poll path.
-      void this.enrich?.(games);
+      /*
+       * Awaited, not fired and forgotten.
+       *
+       * Normalising builds fresh objects every rebuild, so nothing carries over,
+       * and enrichment resolving a microtask after `compose` publishes means it
+       * never lands at all on this path. That costs the NFL its divisions, playoff
+       * seeds and standings win percentage, which prominence and stakes are scored
+       * from, on every push-driven rebuild until the next poll quietly repaired it.
+       * The lookup is cached behind a TTL, so awaiting it is nearly always free.
+       */
+      await this.enrich?.(games);
       for (const raw of games) this.lines.recordFromScoreboard(raw);
       this.compose(games, Date.now(), ` push(${count})`);
     } catch (err) {

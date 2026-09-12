@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Game } from "../../shared/types";
   import { clockLabel, kickoffWhen, scoreColor, teamColor } from "./format";
+  import { slide } from "svelte/transition";
   import WinProbBar from "./WinProbBar.svelte";
 
   let {
@@ -29,6 +30,22 @@
 
   /** Detail is shown when the card cannot fold, or when this one is open. */
   const open = $derived(!collapsible || expanded);
+
+  /*
+   * Height is animated in script rather than in CSS.
+   *
+   * The `grid-template-rows: 0fr -> 1fr` trick is the tidier answer and it did not
+   * size the row here: measured mid-transition it sat at 8px, the padding alone,
+   * while the content behind it was 97px. `slide` measures the real height and
+   * animates to it, which is the thing that has to be right.
+   */
+  const MOTION_MS = 200;
+  /* Asked at the moment a transition starts rather than when the card is built,
+     so turning the setting on takes effect without a reload. */
+  const ms = () =>
+    typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches
+      ? 0
+      : MOTION_MS;
 
   const accent = $derived(scoreColor(score));
   const showWp = $derived(open && variant === "live" && game.score?.hasWinProb === true);
@@ -104,7 +121,12 @@
          a folded 24-21 with no quarter on it is missing what makes it worth a look.
          This column is empty below the number, so it costs width, not height. -->
     {#if !open && variant === "live"}
-      <div class="score-clock mono">{clockText}</div>
+      <div class="score-clock mono" transition:slide={{ duration: ms() }}>{clockText}</div>
+    {/if}
+    {#if collapsible}
+      <svg class="chev" class:open={expanded} viewBox="0 0 12 8" aria-hidden="true">
+        <path d="M1 1.5 L6 6.5 L11 1.5" stroke-linecap="round" stroke-linejoin="round" />
+      </svg>
     {/if}
   </div>
 
@@ -136,14 +158,30 @@
       {/each}
     </div>
 
-    {#if showWp}
+    {#if collapsible}
+      {#if open}
+        <div class="detail" transition:slide={{ duration: ms() }}>
+          {#if variant === "live" && game.score?.hasWinProb === true}
+            <WinProbBar home={game.home} away={game.away} homeWinProb={game.homeWinProb ?? 0.5} />
+          {/if}
+          {#if variant === "live"}
+            <div class="meta">
+              <span class="live-dot"></span>
+              <span class="mono clock">{clockText}</span>
+              {#if game.downDistance}
+                <span class="down mono" class:redzone={game.isRedZone}>{game.downDistance}</span>
+              {/if}
+            </div>
+          {/if}
+        </div>
+      {/if}
+    {:else if showWp}
       <WinProbBar home={game.home} away={game.away} homeWinProb={game.homeWinProb ?? 0.5} />
     {/if}
 
     <!-- Where the game is right now: clock and situation together. A finished game
-         has no clock or situation, so it skips this line entirely and puts FINAL
-         in with the other labels rather than stranding it on a line of its own. -->
-    {#if open && variant === "live"}
+         has no clock or situation, so it skips this line entirely. -->
+    {#if !collapsible && variant === "live"}
       <div class="meta">
         <span class="live-dot"></span>
         <span class="mono clock">{clockText}</span>
@@ -155,9 +193,10 @@
 
     <!-- Labels: how to watch it, and what kind of game it is. -->
     <div class="chips">
+      <!-- No FINAL chip: the section heading says these are finished and the chip
+           sat between the kickoff time and the rest of the labels, splitting them.
+           When the game was, not when it ended, since ESPN gives no end time. -->
       {#if variant === "final"}
-        <span class="final-chip">FINAL</span>
-        <!-- When the game was, not when it ended: ESPN gives no end time. -->
         <span class="played mono">{kickoffWhen(game.startDate)}</span>
       {/if}
       {#if game.broadcast}<span class="channel-chip">{game.broadcast}</span>{/if}
@@ -175,7 +214,7 @@
     </div>
 
     {#if open && variant === "live" && game.lastPlay}
-      <p class="last-play">{game.lastPlay}</p>
+      <p class="last-play" transition:slide={{ duration: ms() }}>{game.lastPlay}</p>
     {/if}
   </div>
 </article>
@@ -192,9 +231,40 @@
     outline: 2px solid var(--accent);
     outline-offset: 2px;
   }
+  /* Folded cards sit tighter, which is most of the vertical space the fold buys.
+     Animated rather than removed: the two end states are both right, it was only
+     the instant jump between them that read as broken. */
   .card.folded {
     padding-top: 10px;
     padding-bottom: 10px;
+  }
+  /* In the rating gutter, not at the right edge, where it competed with the team
+     scores. This column already carries the card's status and nothing else can
+     collide with it. Its presence is also what marks a card as one that opens. */
+  .chev {
+    width: 12px;
+    height: 8px;
+    margin-top: 3px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    color: var(--text-faint);
+    transition: transform 0.22s ease, color 0.15s ease;
+  }
+  .card.collapsible:hover .chev {
+    color: var(--text-dim);
+  }
+  .chev.open {
+    transform: rotate(180deg);
+  }
+  .detail {
+    padding-top: 8px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .chev,
+    .card {
+      transition: none;
+    }
   }
   .played {
     font-size: 11px;
@@ -224,7 +294,11 @@
     border-radius: 12px;
     padding: 14px 18px 14px 0;
     overflow: hidden;
-    transition: border-color 0.15s ease, background 0.15s ease, opacity 0.15s ease;
+    transition:
+      border-color 0.15s ease,
+      background 0.15s ease,
+      opacity 0.15s ease,
+      padding 0.22s ease;
   }
   /* Gated on a real pointer. On touch, tapping latches :hover until you tap
      elsewhere, so the card would just look stuck in a highlighted state. */
@@ -347,15 +421,6 @@
   .clock {
     color: var(--text);
     font-weight: 600;
-  }
-  .final-chip {
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    color: var(--text-faint);
-    border: 1px solid var(--border-hi);
-    border-radius: 4px;
-    padding: 1px 5px;
   }
   /* Chip-shaped so the row lines up, but deliberately quieter than a tag: no
      fill, no uppercase, muted border. This is background info, not a signal. */

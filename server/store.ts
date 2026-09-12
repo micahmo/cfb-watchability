@@ -2,8 +2,17 @@
  * Tracks recent win-probability movement per game.
  *
  * A game that has swung hard in the last few minutes is worth flipping to even
- * if it looks settled at this instant, so we keep a short rolling history and
- * sum the absolute movement across it.
+ * if it looks settled at this instant, so a short rolling history is kept and the
+ * span it covers is what counts as movement.
+ *
+ * It measures the **range**, high-water to low-water, rather than the sum of every
+ * step between samples. Summing steps makes the answer depend on how often the
+ * samples are taken, which stopped being a constant the moment the push feed
+ * replaced a thirty-second poll: the same two games read 0.81 and 0.97 on a server
+ * that had been sampling for forty minutes and 0.06 and 0.12 on one five minutes
+ * old. Both were 0-0. What the sum actually measured was a close game whose win
+ * probability wanders every play, which is why a 0-13 blowout scored zero, its
+ * probability pinned and still. A range cannot be inflated by looking more often.
  */
 
 interface Sample {
@@ -35,15 +44,17 @@ export class SwingStore {
     this.history.set(gameId, samples);
   }
 
-  /** Cumulative absolute win-probability change inside the rolling window. */
+  /** How far win probability has travelled, end to end, inside the window. */
   movement(gameId: string): number {
     const samples = this.history.get(gameId);
     if (!samples || samples.length < 2) return 0;
-    let total = 0;
-    for (let i = 1; i < samples.length; i += 1) {
-      total += Math.abs(samples[i].wp - samples[i - 1].wp);
+    let low = samples[0].wp;
+    let high = samples[0].wp;
+    for (const sample of samples) {
+      if (sample.wp < low) low = sample.wp;
+      if (sample.wp > high) high = sample.wp;
     }
-    return total;
+    return high - low;
   }
 
   prune(now = Date.now()): void {

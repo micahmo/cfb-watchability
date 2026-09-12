@@ -55,9 +55,17 @@ function latenessWeight(progress: number): number {
   return 0.2 + 0.8 * Math.pow(progress, 2);
 }
 
-/** Cumulative absolute win-probability movement, normalized. */
-export function swingScore(totalMovement: number): number {
-  return clamp(totalMovement / 0.5);
+/**
+ * How far win probability ranged in the last quarter of an hour, normalized.
+ *
+ * Half the probability space is a full swing: a game that has gone from 30% to 80%
+ * has changed hands in a way worth switching for, and the `RECENT SWINGS` tag sits
+ * at 0.6 of that, so thirty points of travel. A close game whose probability
+ * wanders a few points a play no longer reaches it, which is the point: wandering
+ * is what close games do, and `tension` already says a game is close.
+ */
+export function swingScore(range: number): number {
+  return clamp(range / 0.5);
 }
 
 /** Endgame drama lives inside the final five minutes of regulation. */

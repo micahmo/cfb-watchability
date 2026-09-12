@@ -293,6 +293,37 @@ The grace period grew from five minutes to two hours for the same reason: the tr
 a delay can push that back a long way, and the bound now exists only so a game postponed to another
 day does not announce itself when it eventually starts.
 
+## A faster feed changed what an old metric meant
+
+`RECENT SWINGS` appeared on two 0-0 games at once. The tag reads `swing`, which was the **cumulative
+sum** of absolute win-probability change across a fifteen-minute window, and a sum over samples
+depends on how often you sample. That had been a constant at one poll every thirty seconds. The push
+feed made it as often as once a second.
+
+The evidence was two servers watching the same two games at the same moment: one running forty
+minutes scored them 0.81 and 0.97 and tagged both, one running five minutes scored the same games
+0.06 and 0.12. Neither had a point on the board.
+
+It also measured the wrong thing even at a fixed rate. A close game's win probability wanders a
+little every play and those wanders accumulate, while a blowout's sits pinned and still, so a 0-13
+game scored zero while 0-0 games topped the list. That is `tension` wearing a different hat, and
+`tension` is already a term.
+
+So `swing` is now the **range**, high-water to low-water, inside the window. A range cannot be
+inflated by looking more often, it ignores wandering that returns to where it started, and it still
+catches a game that changes hands. Verified against a synthetic close game at both sampling rates:
+0.158 at thirty samples and 0.160 at three hundred, where the sum gave answers an order of magnitude
+apart. A genuine 40% to 80% move scores 0.80 and still tags.
+
+**The general lesson is about what a faster feed silently changes.** Nothing about the swing code was
+wrong when it was written; its meaning depended on a cadence that quietly stopped holding. Auditing
+the rest of the server for the same shape found no other metric that accumulates across observations:
+everything else either recomputes from current state or counts within a single pass. It did turn up
+a different fault in the same commit, enrichment fired and forgotten on the push path, where it
+resolved after the snapshot had already been published and so never landed at all. Normalising builds
+fresh objects each rebuild, so nothing carried over, and every push-driven NFL rebuild lost its
+divisions, playoff seeds and standings win percentage until the next poll repaired it.
+
 ## Verifying the model against real games
 
 `scripts/replay.ts` replays a finished game play-by-play through the live model and prints what
