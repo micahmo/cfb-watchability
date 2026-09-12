@@ -95,6 +95,27 @@ export interface Game {
   /** e.g. "3rd & 6 at FSU 21". Null outside live play. */
   downDistance: string | null;
   isRedZone: boolean;
+  /**
+   * Where the ball is, as yards from the **home** team's goal line, 0 to 100.
+   *
+   * Verified against nine live games rather than assumed, because the convention
+   * is not self-evident: "1st & 10 at PSU 42" with Temple at home reports 58, and
+   * "2nd & 10 at MICH 35" with Michigan at home reports 35. So home's goal line is
+   * zero and the away team's is a hundred, whoever has the ball. The side driving
+   * follows from possession: home attacks 100, away attacks 0.
+   */
+  yardLine: number | null;
+  /** Null between plays and on kickoffs, where ESPN sends -1. */
+  down: number | null;
+  distance: number | null;
+  /**
+   * Where the current drive began, in the same coordinate space as `yardLine`.
+   *
+   * Checked against ESPN's own prose rather than trusted: a drive starting at
+   * "OU 25" reports 75 and the ball at "MICH 29" reports 29, and the difference of
+   * 46 is exactly the "6 plays, 46 yards" in the drive description.
+   */
+  driveStart: number | null;
   conferenceGame: boolean;
   /** NFL: both teams in the same division. Meaningless for college. */
   divisionGame: boolean;

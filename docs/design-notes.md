@@ -366,6 +366,44 @@ resolved after the snapshot had already been published and so never landed at al
 fresh objects each rebuild, so nothing carried over, and every push-driven NFL rebuild lost its
 divisions, playoff seeds and standings win percentage until the next poll repaired it.
 
+## The field diagram, and the coordinate system nobody documents
+
+The rating cannot say what is happening. Fourth and one at the goal line and second and ten at
+midfield can score identically, so an expanded card draws the field: ball, line of scrimmage, line
+to gain, the drive so far, and which way the offence is going.
+
+**`situation.yardLine` is yards from the *home* team's goal line, nought to a hundred**, whoever has
+the ball. That is not self-evident and it was verified against nine live games rather than assumed,
+by parsing ESPN's own prose and checking it predicted the number: "1st & 10 at PSU 42" with Temple
+at home reports 58, "2nd & 10 at MICH 35" with Michigan at home reports 35. Nine of nine. Direction
+follows from possession, home attacking a hundred and away attacking nought, and the line to gain is
+the ball give or take the distance by that direction.
+
+`situation.lastPlay.drive.start.yardLine` is in the same space, so the arrow spans the drive rather
+than pointing vaguely downfield, and its length is the ground gained. That was checked the same way:
+a drive starting at "OU 25" (75) with the ball at "MICH 29" (29) is 46 yards, and the description
+reads "6 plays, 46 yards".
+
+Four things it refuses to draw, all the same principle, that a picture which states something false
+is worse than no picture:
+
+- **Nothing without the whole situation.** `down`, `distance` and `yardLine` all go missing between
+  plays, on kickoffs and through the gaps where ESPN drops the block entirely. No data, no field.
+- **No line to gain on first and goal.** The distance overshoots the goal line, and a marker beyond
+  the end zone is a line that does not exist.
+- **No drive arrow when the drive contradicts the ball.** `lastPlay.drive` still describes the
+  previous possession for a moment after a turnover, which would draw an arrow running backwards
+  through the ball. Seen immediately: a team attacking nought reported a drive starting at nought.
+  When the start is not behind the ball, it falls back to a stub showing direction only.
+- **No field-goal range.** It is not derivable and would be invention.
+
+Yard numbers sit every ten, as a real field is painted, minus whichever ones the two lines are
+standing on. Every twenty was tried first and read as a fault rather than a choice: with the forty
+and the fifty both suppressed the row jumped from 40 to 20, where a 30 and a 10 would have fitted.
+
+It updates from the push feed like everything else, which was measured rather than assumed: ball
+movements arrive on push frames, never waiting for a poll.
+
 ## Verifying the model against real games
 
 `scripts/replay.ts` replays a finished game play-by-play through the live model and prints what

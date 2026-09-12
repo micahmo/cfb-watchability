@@ -1,0 +1,222 @@
+<script lang="ts">
+  import type { Game } from "../../shared/types";
+  import { teamColor } from "./format";
+
+  let { game }: { game: Game } = $props();
+
+  /*
+   * Drawn only when the whole situation is there.
+   *
+   * `down`, `distance` and `yardLine` all go missing between plays, on kickoffs
+   * and during the stretches when ESPN drops the situation block, and a field
+   * showing the last known ball position as though it were current is a worse
+   * answer than no field at all. Possession is required too: without it there is
+   * no direction of play, and the arrow and the first-down line would both be
+   * guesses.
+   */
+  const situation = $derived(
+    game.state === "in" &&
+      game.yardLine !== null &&
+      game.down !== null &&
+      game.distance !== null &&
+      game.possessionTeamId !== null
+      ? { yardLine: game.yardLine, down: game.down, distance: game.distance }
+      : null,
+  );
+
+  const homeHasBall = $derived(game.possessionTeamId === game.home.id);
+  /** Home defends the zero end, so it attacks 100 and the away team attacks zero. */
+  const towardHundred = $derived(homeHasBall);
+
+  const firstDown = $derived.by(() => {
+    if (situation === null) return null;
+    const raw = towardHundred
+      ? situation.yardLine + situation.distance
+      : situation.yardLine - situation.distance;
+    // Clamped to the goal line: on first and goal the distance overshoots the
+    // field, and a marker drawn past the end zone would be a line that does not
+    // exist. Nothing is drawn at all once it lands on the goal line itself.
+    const clamped = Math.max(0, Math.min(100, raw));
+    return clamped <= 0 || clamped >= 100 ? null : clamped;
+  });
+
+  /**
+   * The drive so far: from where it began to where the ball is now.
+   *
+   * More useful than a bare direction marker, because it says how far this
+   * possession has already come. Guarded on consistency rather than trusted:
+   * `lastPlay.drive` still describes the previous possession for a moment after a
+   * turnover, which would draw an arrow running backwards through the ball. If the
+   * start is not behind the ball relative to the way this team is attacking, or
+   * the drive has not moved, it falls back to a short stub that only shows which
+   * way play is going.
+   */
+  const drive = $derived.by(() => {
+    if (situation === null || game.driveStart === null) return null;
+    const from = game.driveStart;
+    const to = situation.yardLine;
+    const sane = towardHundred ? from < to : from > to;
+    return sane ? from : null;
+  });
+
+  /* Geometry in user units: ten per end zone, a hundred of field between them. */
+  const EZ = 10;
+  const W = 100 + EZ * 2;
+  const H = 24;
+  const x = (yard: number) => EZ + yard;
+
+  /**
+   * Yard numbers every ten, as a real field is painted, minus the ones the two
+   * lines are standing on.
+   *
+   * Every twenty was tried first and read as a mistake rather than a choice: with
+   * the forty and the fifty both suppressed the row jumped straight from 40 to 20
+   * and looked like something had failed, when a 30 and a 10 would have sat there
+   * perfectly well. At ten-yard spacing each line hides at most its nearest
+   * neighbour, so the gap is small enough to read as deliberate.
+   */
+  const MARKS = [10, 20, 30, 40, 50, 60, 70, 80, 90];
+  const marks = $derived.by(() => {
+    if (situation === null) return [];
+    const clear = (yard: number) =>
+      Math.abs(yard - situation.yardLine) > 6 && (firstDown === null || Math.abs(yard - firstDown) > 6);
+    // Numbered from the nearer goal line, the way a real field is painted.
+    return MARKS.filter(clear).map((yard) => ({ yard, label: yard <= 50 ? yard : 100 - yard }));
+  });
+
+  const homeColor = $derived(teamColor(game.home));
+  const awayColor = $derived(teamColor(game.away));
+</script>
+
+{#if situation !== null}
+  <svg class="field" viewBox="0 0 {W} {H}" role="img" aria-label={game.downDistance ?? "field position"}>
+    <!-- Home defends the left end, always. A field that mirrored itself whenever
+         possession changed would be unreadable at a glance, so the picture stays
+         still and the arrow carries the direction instead. -->
+    <rect x="0" y="0" width={EZ} height={H} fill={homeColor} opacity="0.85" />
+    <rect x={EZ + 100} y="0" width={EZ} height={H} fill={awayColor} opacity="0.85" />
+    <rect x={EZ} y="0" width="100" height={H} fill="var(--field)" />
+
+    {#if game.isRedZone}
+      <!-- The twenty the offence is attacking, not both. -->
+      <rect
+        x={towardHundred ? x(80) : x(0)}
+        y="0"
+        width="20"
+        height={H}
+        fill="var(--warm)"
+        opacity="0.14"
+      />
+    {/if}
+
+    {#each [10, 20, 30, 40, 50, 60, 70, 80, 90] as yard (yard)}
+      <line x1={x(yard)} y1="0" x2={x(yard)} y2={H} class="yard" class:fifty={yard === 50} />
+    {/each}
+
+    {#each marks as mark (mark.yard)}
+      <text class="yard-num" x={x(mark.yard)} y={H - 3.2}>{mark.label}</text>
+    {/each}
+
+    {#if firstDown !== null}
+      <line x1={x(firstDown)} y1="0" x2={x(firstDown)} y2={H} class="first-down" />
+    {/if}
+    <line x1={x(situation.yardLine)} y1="0" x2={x(situation.yardLine)} y2={H} class="scrimmage" />
+
+    <!-- The drive, tail at its start and head at the ball, so the arrow is behind
+         the ball rather than in front of it and its length is the ground gained. -->
+    {#if drive !== null}
+      <path
+        class="arrow"
+        d={`M ${x(drive)} ${H / 2} H ${x(situation.yardLine) + (towardHundred ? -3.8 : 3.8)}`}
+      />
+      <path
+        class="arrow head"
+        d={towardHundred
+          ? `M ${x(situation.yardLine) - 6.6} ${H / 2 - 2.4} l 2.8 2.4 l -2.8 2.4`
+          : `M ${x(situation.yardLine) + 6.6} ${H / 2 - 2.4} l -2.8 2.4 l 2.8 2.4`}
+      />
+    {:else}
+      <path
+        class="arrow head"
+        d={towardHundred
+          ? `M ${x(situation.yardLine) + 4} ${H / 2 - 2.4} l 2.8 2.4 l -2.8 2.4`
+          : `M ${x(situation.yardLine) - 4} ${H / 2 - 2.4} l -2.8 2.4 l 2.8 2.4`}
+      />
+    {/if}
+
+    <ellipse class="ball" cx={x(situation.yardLine)} cy={H / 2} rx="3" ry="1.9" />
+
+    <text class="ez" x={EZ / 2} y={H / 2} transform="rotate(-90 {EZ / 2} {H / 2})">
+      {game.home.abbrev}
+    </text>
+    <text class="ez" x={EZ + 100 + EZ / 2} y={H / 2} transform="rotate(90 {EZ + 100 + EZ / 2} {H / 2})">
+      {game.away.abbrev}
+    </text>
+  </svg>
+{/if}
+
+<style>
+  .field {
+    display: block;
+    width: 100%;
+    height: auto;
+    margin: 8px 0 2px;
+    border-radius: 3px;
+    overflow: hidden;
+    /* Not a literal grass green. The card is dark and a saturated pitch would
+       shout louder than the score it sits under. */
+    --field: color-mix(in srgb, var(--bg-card-hi) 82%, #2f6f4a 18%);
+  }
+  .yard {
+    stroke: var(--border-hi);
+    stroke-width: 0.4;
+    opacity: 0.5;
+  }
+  .fifty {
+    opacity: 0.9;
+  }
+  /* Television convention, because it needs no explaining: the line to gain is
+     yellow and the line of scrimmage is blue. */
+  .first-down {
+    stroke: #ffd34d;
+    stroke-width: 1.1;
+  }
+  .scrimmage {
+    stroke: #4da3ff;
+    stroke-width: 1.1;
+  }
+  .ball {
+    fill: #d8c59a;
+    stroke: rgba(0, 0, 0, 0.55);
+    stroke-width: 0.5;
+  }
+  .arrow {
+    fill: none;
+    stroke: var(--text);
+    stroke-width: 1;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    opacity: 0.55;
+  }
+  .arrow.head {
+    opacity: 0.8;
+  }
+  .yard-num {
+    fill: var(--text-faint);
+    font-size: 4.2px;
+    font-weight: 600;
+    text-anchor: middle;
+    opacity: 0.85;
+  }
+  .ez {
+    fill: #fff;
+    font-size: 5.4px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-anchor: middle;
+    dominant-baseline: central;
+    paint-order: stroke;
+    stroke: rgba(0, 0, 0, 0.35);
+    stroke-width: 1.2;
+  }
+</style>

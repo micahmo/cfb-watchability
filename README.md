@@ -35,6 +35,10 @@ shows kickoff time, the line, the over/under and the network.
 
 **Just finished**, the recent recap, best first. Games stay on the board for eighteen hours.
 
+An open live card draws the field: where the ball is, the line of scrimmage, the line to gain, how
+far the drive has come and which way the offence is going. It appears only while a play is set, so
+between drives and on kickoffs there is simply no diagram rather than a stale one.
+
 Live cards fold by default and open when tapped, six at a time with an expander for the rest. The
 best game on starts open. A folded card keeps the teams, records, line, possession, score, clock,
 network and tags; opening one adds the win probability, down and distance, and the last play.

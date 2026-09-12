@@ -85,6 +85,11 @@ function toSide(competitor: any): TeamSide {
   };
 }
 
+/** A situation number, or null when ESPN is reporting one of its sentinels. */
+function fieldNumber(raw: unknown, min: number, max: number): number | null {
+  return typeof raw === "number" && Number.isFinite(raw) && raw >= min && raw <= max ? raw : null;
+}
+
 function normalize(event: any, league: League): RawGame | null {
   const comp = event?.competitions?.[0];
   if (!comp) return null;
@@ -150,6 +155,11 @@ function normalize(event: any, league: League): RawGame | null {
     possessionTeamId: comp?.situation?.possession != null ? String(comp.situation.possession) : null,
     downDistance: comp?.situation?.downDistanceText ?? null,
     isRedZone: Boolean(comp?.situation?.isRedZone),
+    // ESPN uses -1 for "no play in progress", which is a value, not a position.
+    yardLine: fieldNumber(comp?.situation?.yardLine, 0, 100),
+    down: fieldNumber(comp?.situation?.down, 1, 4),
+    distance: fieldNumber(comp?.situation?.distance, 0, 99),
+    driveStart: fieldNumber(comp?.situation?.lastPlay?.drive?.start?.yardLine, 0, 100),
     conferenceGame: Boolean(comp.conferenceCompetition),
     // Filled in later from the standings feed; the scoreboard does not carry it.
     divisionGame: false,

@@ -2,6 +2,7 @@
   import type { Game } from "../../shared/types";
   import { clockLabel, kickoffWhen, scoreColor, teamColor } from "./format";
   import { slide } from "svelte/transition";
+  import FieldPosition from "./FieldPosition.svelte";
   import WinProbBar from "./WinProbBar.svelte";
 
   let {
@@ -172,6 +173,9 @@
                 <span class="down mono" class:redzone={game.isRedZone}>{game.downDistance}</span>
               {/if}
             </div>
+            <!-- Draws itself only when the whole situation is present, so between
+                 plays it simply is not there rather than showing a stale field. -->
+            <FieldPosition {game} />
           {/if}
           <!-- Above the tags rather than below them: it belongs with the clock and
                the situation it describes, and it is also where the expansion grows

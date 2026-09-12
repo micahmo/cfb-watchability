@@ -161,6 +161,10 @@ export class LeaguePoller {
       downDistance: string | null;
       isRedZone: boolean;
       lastPlay: string | null;
+      yardLine: number | null;
+      down: number | null;
+      distance: number | null;
+      driveStart: number | null;
     }
   >();
   private season: number | null = null;
@@ -506,6 +510,10 @@ export class LeaguePoller {
           downDistance: game.downDistance,
           isRedZone: game.isRedZone,
           lastPlay: game.lastPlay,
+          yardLine: game.yardLine,
+          down: game.down,
+          distance: game.distance,
+          driveStart: game.driveStart,
         });
         continue;
       }
@@ -517,6 +525,10 @@ export class LeaguePoller {
       game.downDistance = held.downDistance;
       game.isRedZone = held.isRedZone;
       game.lastPlay = held.lastPlay;
+      game.yardLine = held.yardLine;
+      game.down = held.down;
+      game.distance = held.distance;
+      game.driveStart = held.driveStart;
     }
   }
 
