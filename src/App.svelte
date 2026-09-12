@@ -17,6 +17,21 @@
   /** Planning horizon. Beyond a few days out, lines move and this stops being useful. */
   const MAX_DAYS = 3;
   const MAX_PER_DAY = 6;
+  /**
+   * How many live and finished cards to show before an expander.
+   *
+   * The same number as a day of the planning list, for the same reason. A busy
+   * Saturday peaks at 32 concurrent games, which at full card size is nearly
+   * eight phone screens before the planning list even begins, and the list is
+   * ranked, so the tail is the part nobody would switch to anyway.
+   */
+  const MAX_CARDS = 6;
+
+  /** Cards the viewer has opened, by game id. Survives a poll; the list re-renders. */
+  let openCards = $state<Record<string, boolean>>({});
+  let showAllLive = $state(false);
+  let showAllRecent = $state(false);
+  const toggleCard = (id: string) => (openCards[id] = !openCards[id]);
 
   /** Day keys the user has expanded past MAX_PER_DAY. */
   let expanded = $state<Record<string, boolean>>({});
@@ -178,8 +193,11 @@
     topScore >= 75 ? "TURN THIS ON" : topScore >= 55 ? "BEST GAME ON" : "BEST OF WHAT IS ON",
   );
   const rest = $derived(live.slice(1));
+  // No slice here any more: folding made the list cheap, so MAX_CARDS decides how
+  // many show and the expander reaches the rest. Cutting at five before the
+  // expander existed meant the server sent twelve and seven were unreachable.
   const recent = $derived(
-    [...(snapshot?.recent ?? [])].sort((a, b) => scoreOf(b) - scoreOf(a)).slice(0, 5),
+    [...(snapshot?.recent ?? [])].sort((a, b) => scoreOf(b) - scoreOf(a)),
   );
   // Grouped by day, days in chronological order, ranked within each day. You plan
   // Friday before you plan Saturday, so a better Saturday game must not outrank
@@ -296,10 +314,24 @@
   <section>
     <h2 class="section-head">Also live <span class="count">{rest.length}</span></h2>
     <div class="stack">
-      {#each rest as game (game.id)}
-        <GameCard {game} score={scoreOf(game)} />
+      <!-- Folded by default. The hero above is the answer to "what should I put
+           on" and stays open; these are the alternatives, and a glance down a list
+           of them is the question being asked here. -->
+      {#each showAllLive ? rest : rest.slice(0, MAX_CARDS) as game (game.id)}
+        <GameCard
+          {game}
+          score={scoreOf(game)}
+          collapsible
+          expanded={openCards[game.id] === true}
+          ontoggle={() => toggleCard(game.id)}
+        />
       {/each}
     </div>
+    {#if rest.length > MAX_CARDS}
+      <button type="button" class="show-all" onclick={() => (showAllLive = !showAllLive)}>
+        {showAllLive ? "Show fewer" : `Show all ${rest.length}`}
+      </button>
+    {/if}
   </section>
 {:else if !loading && !loadError && live.length === 0}
   <div class="panel">
@@ -374,10 +406,22 @@
     <section>
       <h2 class="section-head">Just finished, best first</h2>
       <div class="stack">
-        {#each recent as game (game.id)}
-          <GameCard {game} score={scoreOf(game)} variant="final" />
+        {#each showAllRecent ? recent : recent.slice(0, MAX_CARDS) as game (game.id)}
+          <GameCard
+            {game}
+            score={scoreOf(game)}
+            variant="final"
+            collapsible
+            expanded={openCards[game.id] === true}
+            ontoggle={() => toggleCard(game.id)}
+          />
         {/each}
       </div>
+      {#if recent.length > MAX_CARDS}
+        <button type="button" class="show-all" onclick={() => (showAllRecent = !showAllRecent)}>
+          {showAllRecent ? "Show fewer" : `Show all ${recent.length}`}
+        </button>
+      {/if}
     </section>
   {/if}
 </div>

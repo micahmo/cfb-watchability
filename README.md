@@ -35,6 +35,11 @@ shows kickoff time, the line, the over/under and the network.
 
 **Just finished**, the recent recap, best first. Games stay on the board for eighteen hours.
 
+Live and finished cards are folded to a single line by default and open when tapped, six at a time
+with an expander for the rest. The best game on stays open. A folded card keeps the teams, records,
+line, possession, score, clock and tags; opening one adds the win probability, down and distance,
+last play and network.
+
 **Alerts**, optional, off by default. Five kinds, chosen per league: a game becoming worth
 switching to, one turning into something memorable, an upset in progress, the pick of a busy
 kickoff window, and NFL primetime, where the only game in its slot is starting and the alert says

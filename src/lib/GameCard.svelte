@@ -7,14 +7,31 @@
     game,
     score,
     variant = "live",
+    collapsible = false,
+    expanded = true,
+    ontoggle,
   }: {
     game: Game;
     score: number;
     variant?: "live" | "final";
+    /**
+     * Whether this card can be folded away.
+     *
+     * A busy Saturday peaks at 32 concurrent games, and at full size that is
+     * nearly eight phone screens of live cards before the planning list even
+     * starts. The hero is deliberately never collapsible: it is the answer to
+     * "what should I put on", so hiding its detail defeats the point of it.
+     */
+    collapsible?: boolean;
+    expanded?: boolean;
+    ontoggle?: () => void;
   } = $props();
 
+  /** Detail is shown when the card cannot fold, or when this one is open. */
+  const open = $derived(!collapsible || expanded);
+
   const accent = $derived(scoreColor(score));
-  const showWp = $derived(variant === "live" && game.score?.hasWinProb === true);
+  const showWp = $derived(open && variant === "live" && game.score?.hasWinProb === true);
   // Dimming the team that is behind reads as "this one lost", which is only true
   // once the game is over. Mid-game both teams stay at full weight.
   const leader = $derived(
@@ -52,11 +69,43 @@
   ]);
 </script>
 
-<article class="card" class:unavailable style="--accent: {accent}">
+<!-- The card stays an <article> and takes the button role rather than becoming one:
+     it holds headings, logos and a list of labels, which is article content, and a
+     <button> wrapping all of that is announced as one long unreadable label. Both
+     rules are suppressed deliberately; role, tabindex, aria-expanded and the
+     Enter/Space handler together give the same behaviour a button would. -->
+<!-- svelte-ignore a11y_no_noninteractive_element_to_interactive_role -->
+<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+<article
+  class="card"
+  class:unavailable
+  class:collapsible
+  class:folded={collapsible && !expanded}
+  style="--accent: {accent}"
+  role={collapsible ? "button" : undefined}
+  tabindex={collapsible ? 0 : undefined}
+  aria-expanded={collapsible ? expanded : undefined}
+  onclick={collapsible ? () => ontoggle?.() : undefined}
+  onkeydown={collapsible
+    ? (e: KeyboardEvent) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          ontoggle?.();
+        }
+      }
+    : undefined}
+>
   <div class="rail"></div>
 
   <div class="score-col">
     <div class="score-num mono">{Math.round(score)}</div>
+    <!-- Folded, the clock rides here rather than on a line of its own. "Close and
+         late" is the question the board answers and lateness drives the rating, so
+         a folded 24-21 with no quarter on it is missing what makes it worth a look.
+         This column is empty below the number, so it costs width, not height. -->
+    {#if !open && variant === "live"}
+      <div class="score-clock mono">{clockText}</div>
+    {/if}
   </div>
 
   <div class="main">
@@ -94,7 +143,7 @@
     <!-- Where the game is right now: clock and situation together. A finished game
          has no clock or situation, so it skips this line entirely and puts FINAL
          in with the other labels rather than stranding it on a line of its own. -->
-    {#if variant === "live"}
+    {#if open && variant === "live"}
       <div class="meta">
         <span class="live-dot"></span>
         <span class="mono clock">{clockText}</span>
@@ -107,27 +156,55 @@
     <!-- Labels: how to watch it, and what kind of game it is. -->
     <div class="chips">
       {#if variant === "final"}<span class="final-chip">FINAL</span>{/if}
-      {#if game.broadcast}<span class="channel-chip">{game.broadcast}</span>{/if}
-      {#if !game.nationalBroadcast}<span class="note warn">local feed</span>{/if}
+      {#if open && game.broadcast}<span class="channel-chip">{game.broadcast}</span>{/if}
+      {#if open && !game.nationalBroadcast}<span class="note warn">local feed</span>{/if}
       <!-- Only shown once a postal code makes the answer real. Before that every
            1:00 game is equally "regional", which is noise rather than a signal. -->
       <!-- Only the exclusion. The channel chip already says CBS or FOX, and the
            grid's call signs span neighbouring markets whose affiliates this viewer
            cannot receive, so naming them was noise at best and wrong at worst. -->
       {#if unavailable}<span class="note">not on your channels</span>{/if}
-      {#if game.conferenceGame}<span class="note">conference game</span>{/if}
+      {#if open && game.conferenceGame}<span class="note">conference game</span>{/if}
       {#each game.tags as tag (tag)}
         <span class="tag" class:hot={HOT_TAGS.has(tag)}>{tag}</span>
       {/each}
     </div>
 
-    {#if variant === "live" && game.lastPlay}
+    {#if open && variant === "live" && game.lastPlay}
       <p class="last-play">{game.lastPlay}</p>
     {/if}
   </div>
 </article>
 
 <style>
+  .card.collapsible {
+    cursor: pointer;
+    /* The whole card is the target rather than a chevron: a 196px row reduced to
+       one line is still a large tap area, and aiming at a 12px caret on a phone
+       is the kind of precision nobody should need for "show me more". */
+    -webkit-tap-highlight-color: transparent;
+  }
+  .card.collapsible:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  .card.folded {
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+  .score-clock {
+    margin-top: 2px;
+    /* Sized so the longest label a game can produce, "10:31 4th", still fits the
+       rating column. At 10px it measured 53px against a 52px column and spilled a
+       little past the rating above it, which reads as a ragged left edge down a
+       list of folded cards. */
+    font-size: 9px;
+    letter-spacing: -0.01em;
+    line-height: 1.2;
+    color: var(--text-faint);
+    text-align: center;
+    white-space: nowrap;
+  }
   .card {
     position: relative;
     display: grid;

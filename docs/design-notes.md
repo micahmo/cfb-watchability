@@ -171,6 +171,33 @@ The day boundary used for the cap is the server's, and the one used for grouping
 They agree whenever the two share a timezone; where they do not, a game near midnight counts
 against the neighbouring day's budget, which at this size trims nothing.
 
+## The live list has to fold
+
+Every live game renders, and nothing capped that. Measured on a 375-wide phone, a live card is
+196px and an upcoming row is 57px, so the two lists scale very differently. Tomorrow's college
+schedule has 80 games; assuming three and a half hours each, peak concurrency is 32 at around 9pm.
+That is 6,272px of live cards, nearly eight phone screens, before the planning list even starts.
+
+So the live cards fold. Folded is 80 to 100px depending on how many tags a game carries, and only
+six show before an expander, the same number a day of the planning list shows and for the same
+reason: the list is ranked, so the tail is the part nobody would switch to.
+
+What stays visible when folded is the part that decides whether to look closer: teams, records,
+the closing line, possession, score, the tags, and the clock. **The clock is the argument.** Close
+and late is the question this board answers and lateness is the dominant term in the rating, so a
+folded card reading 24-21 with no quarter on it has hidden the thing that makes 24-21 interesting.
+It rides in the rating column under the number, which is empty space next to a two-row team block,
+so it costs width rather than height. "Not on your channels" survives folding too, since it decides
+whether the game is a candidate at all.
+
+Opening one adds the win probability bar, the down and distance, the last play, the network and
+the conference note.
+
+The hero is never foldable. It is the answer to "what should I put on", so hiding its detail defeats
+the point of having it, and there is only ever one of it. Finished games fold on the same mechanism;
+they are capped at twelve by the server rather than thirty-two, but twelve full cards is still more
+than two screens.
+
 ## Verifying the model against real games
 
 `scripts/replay.ts` replays a finished game play-by-play through the live model and prints what
