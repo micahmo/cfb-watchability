@@ -452,15 +452,29 @@ export class LeaguePoller {
     }
     this.swings.prune(now);
 
+    /*
+     * ESPN moves a game out of `pre` before a snap is played, for a weather delay
+     * or a long pregame, and such a game reads as 0-0 in period 0. That is not
+     * live, and left in the live list it does not merely appear, it *leads*: a
+     * scoreless game is maximally close, so it scores tension 1.00 and takes the
+     * hero slot. Observed doing exactly that, recommending a delayed game as the
+     * best thing on. A period is the evidence that football has been played.
+     */
+    const started = (g: RawGame) => g.state === "in" && g.period >= 1;
     const live = games
-      .filter((g) => g.state === "in")
+      .filter(started)
       .map((g) => this.withScore(g, this.swings.movement(g.id)))
       .sort((a, b) => (b.score?.total ?? 0) - (a.score?.total ?? 0));
 
     // Prefer the forward-looking fetch, falling back to whatever the current
-    // week's board happens to carry.
-    const upcomingSource =
-      this.scheduled.length > 0 ? this.scheduled : games.filter((g) => g.state === "pre");
+    // week's board happens to carry. Games that have left `pre` without starting
+    // are folded in here, since "has not kicked off yet" is exactly what they are
+    // and dropping them would make a delayed game vanish from the board entirely.
+    const notStarted = games.filter((g) => g.state === "in" && g.period < 1);
+    const upcomingSource = [
+      ...(this.scheduled.length > 0 ? this.scheduled : games.filter((g) => g.state === "pre")),
+      ...notStarted,
+    ];
     const seen = new Set([...live, ...games.filter((g) => g.state === "post")].map((g) => g.id));
     const upcoming = capPerDay(
       upcomingSource

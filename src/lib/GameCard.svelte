@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Game } from "../../shared/types";
-  import { clockLabel, scoreColor, teamColor } from "./format";
+  import { clockLabel, kickoffWhen, scoreColor, teamColor } from "./format";
   import WinProbBar from "./WinProbBar.svelte";
 
   let {
@@ -155,7 +155,11 @@
 
     <!-- Labels: how to watch it, and what kind of game it is. -->
     <div class="chips">
-      {#if variant === "final"}<span class="final-chip">FINAL</span>{/if}
+      {#if variant === "final"}
+        <span class="final-chip">FINAL</span>
+        <!-- When the game was, not when it ended: ESPN gives no end time. -->
+        <span class="played mono">{kickoffWhen(game.startDate)}</span>
+      {/if}
       {#if game.broadcast}<span class="channel-chip">{game.broadcast}</span>{/if}
       {#if !game.nationalBroadcast}<span class="note warn">local feed</span>{/if}
       <!-- Only shown once a postal code makes the answer real. Before that every
@@ -191,6 +195,11 @@
   .card.folded {
     padding-top: 10px;
     padding-bottom: 10px;
+  }
+  .played {
+    font-size: 11px;
+    color: var(--text-faint);
+    align-self: center;
   }
   .score-clock {
     margin-top: 2px;

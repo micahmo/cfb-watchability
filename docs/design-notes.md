@@ -254,6 +254,45 @@ The network never folds either, on any card. Where to watch a game is not the bu
 it is exactly backwards on the card you are deciding whether to switch to. It costs a wrapped tag row
 on a card carrying two long tags, which is the right trade.
 
+## A game that has not started is not a close game
+
+ESPN moves a game out of `pre` before a snap is played, for a weather delay or a long pregame, and
+such a game reads 0-0 in period 0. Left in the live list it does not merely appear, it **leads**:
+scoreless is maximally close, so it scores `tension` 1.00. Seen live on a Saturday, a delayed
+Oregon game sat at the top of the board as the best thing on, recommending a game where the ball
+had not been kicked.
+
+So a period, not a state, is the evidence that football has been played. Games in `in` with period
+0 are folded into the planning list instead, since "has not kicked off yet" is exactly what they
+are, and dropping them would make a delayed game vanish from the board altogether. The row says
+`Delayed` rather than a kickoff time that is no longer going to happen.
+
+This is the third instance in two days of the same family, and the family is worth naming: **a
+quantity that starts at its most extreme value and only becomes meaningful once play begins.** A
+0-0 game is perfectly close. A 46.5-point underdog is perfectly ahead of the spread before kickoff.
+Points scored start below any absolute bar and cross it simply by the game continuing. Each one
+needed the same correction, which is to measure against how much game has actually happened.
+
+## Kickoff alerts fire on the kick, not the clock
+
+The alert used to fire when the scheduled time passed. A listed kickoff is when the television
+window opens and the ball goes up five to ten minutes later, so the notification arrived while the
+board still showed nothing live and every game in the window still read as upcoming. Reported from
+both ends on the same afternoon: a kickoff alert for a game that had not started.
+
+It now waits for the chosen game to actually be in progress, which is a transition like every other
+alert in this file rather than a timestamp. Two details make that work. The window is grouped from
+live and upcoming together, because a window empties as its games kick off, and grouping only what
+is still pregame would shrink a twelve-game noon slate down until the last straggler looked like a
+window with one game in it, which is the exact condition the primetime alert fires on. And
+anticipation is remembered per game as snapshots go by, because a game drops its pregame rating the
+moment it starts, and without the memo the game that just kicked off would rank last in its own
+window.
+
+The grace period grew from five minutes to two hours for the same reason: the trigger is the kick,
+a delay can push that back a long way, and the bound now exists only so a game postponed to another
+day does not announce itself when it eventually starts.
+
 ## Verifying the model against real games
 
 `scripts/replay.ts` replays a finished game play-by-play through the live model and prints what

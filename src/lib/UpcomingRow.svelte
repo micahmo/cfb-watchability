@@ -2,7 +2,26 @@
   import type { Game } from "../../shared/types";
   import { kickoffTime, scoreColor, teamColor } from "./format";
 
-  let { game, score }: { game: Game; score?: number } = $props();
+  let { game, score, now = Date.now() }: { game: Game; score?: number; now?: number } = $props();
+
+  /*
+   * What the time column says when the scheduled time has gone by.
+   *
+   * A listed kickoff is when the television window opens, and the ball goes up
+   * five to ten minutes later, so a row can sit in the planning list showing a
+   * time that has already passed with nothing to say it is under way. That is
+   * what made a kickoff notification look wrong: the alert said the window had
+   * started and thirteen games still read as upcoming at 12:00. `Delayed` is the
+   * other case, a game ESPN has moved out of `pre` without a snap being played.
+   */
+  const when = $derived(
+    game.state === "in"
+      ? "Delayed"
+      : Date.parse(game.startDate) <= now
+        ? "Now"
+        : kickoffTime(game.startDate),
+  );
+  const imminent = $derived(when !== kickoffTime(game.startDate));
 
   const shown = $derived(score ?? game.anticipation ?? 0);
 
@@ -14,7 +33,7 @@
 <div class="row" class:unavailable>
   <div class="score mono" style="color: {accent}">{Math.round(shown)}</div>
   <div class="when mono">
-    <span class="time">{kickoffTime(game.startDate)}</span>
+    <span class="time" class:imminent>{when}</span>
   </div>
   <div class="matchup">
     <span class="teams">
@@ -69,6 +88,11 @@
   .time {
     color: var(--text);
     font-weight: 600;
+  }
+  /* Warm rather than loud. It is a correction to a stale clock, not an alarm. */
+  .time.imminent {
+    color: var(--warm);
+    font-size: 11px;
   }
   .matchup {
     min-width: 0;

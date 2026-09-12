@@ -41,8 +41,15 @@ const KICKOFF_MIN_SLATE = 4;
  * about. College has no equivalent, so this is NFL only.
  */
 const PRIMETIME_MAX_SLATE = 1;
-/** How long after kickoff a "starting now" alert is still true. */
-const KICKOFF_GRACE_MS = 5 * 60 * 1000;
+/**
+ * How long after the scheduled time a kickoff alert may still fire.
+ *
+ * Generous, because the trigger is the game actually starting rather than the
+ * clock reaching its scheduled time, and a weather delay can push that back an
+ * hour or more. The bound exists only so a game postponed to another day does not
+ * announce itself when it eventually kicks.
+ */
+const KICKOFF_GRACE_MS = 2 * 60 * 60 * 1000;
 
 const DAILY_CAP = 3;
 const COOLDOWN_MS = 10 * 60 * 1000;
@@ -99,6 +106,8 @@ export class AlertEngine {
   private dailyCount = new Map<string, number>();
   /** Kickoff windows already announced, keyed by league and slot. */
   private announced = new Set<string>();
+  /** Pregame anticipation by game id, which the game itself drops once it starts. */
+  private anticipation = new Map<string, number>();
 
   constructor(private readonly store: SubscriptionStore) {}
 
@@ -164,8 +173,14 @@ export class AlertEngine {
     const wantsPrimetime = wants.includes("primetime") && league === "nfl";
     if (!wantsKickoff && !wantsPrimetime) return [];
 
+    /*
+     * Built from live and upcoming together, because a window empties as its games
+     * kick off. Grouping only what is still pregame shrinks a twelve-game noon
+     * window down as it starts, and the last straggler would read as a window with
+     * one game in it, which is the exact condition the primetime alert fires on.
+     */
     const slots = new Map<string, Game[]>();
-    for (const game of snapshot.upcoming) {
+    for (const game of [...snapshot.upcoming, ...snapshot.live]) {
       const bucket = slots.get(game.startDate);
       if (bucket) bucket.push(game);
       else slots.set(game.startDate, [game]);
@@ -178,15 +193,32 @@ export class AlertEngine {
       const category: Category = solo ? "primetime" : "kickoff";
       if (solo ? !wantsPrimetime : !(wantsKickoff && games.length >= KICKOFF_MIN_SLATE)) continue;
       const kick = Date.parse(startDate);
-      // At kickoff, not before. A heads-up half an hour early is the planning
-      // list again; the point of this one is that it is starting now.
       if (!(now >= kick && now - kick < KICKOFF_GRACE_MS)) continue;
       const key = `${league}:${startDate}`;
       if (this.announced.has(key)) continue;
 
-      const rank = (g: Game) => (g.anticipation ?? 0) + favoriteBoost(g, favorites);
+      // Anticipation is only carried while a game is pregame, so it is remembered
+      // as each snapshot goes by and read back here. Without it the moment a game
+      // kicks off it would rank last in its own window.
+      const rank = (g: Game) =>
+        (g.anticipation ?? this.anticipation.get(g.id) ?? 0) + favoriteBoost(g, favorites);
       const best = games.filter((g) => !unavailable(g)).sort((a, b) => rank(b) - rank(a))[0];
       if (!best) continue;
+
+      /*
+       * The ball has to be in the air, not merely due.
+       *
+       * A scheduled time is when the television window opens; the kick lands five
+       * to ten minutes later, so firing on the clock told somebody a game had
+       * started while the board still showed nothing live and every game in the
+       * window still read as upcoming. Waiting for the pick to actually be in
+       * progress makes the notification true and the board agree with it.
+       *
+       * The period check matters as much as the state: ESPN moves a delayed game
+       * out of `pre` without it having started, which is how a 0-0 game showing
+       * "Delayed" ends up looking live.
+       */
+      if (best.state !== "in" || best.period < 1) continue;
 
       this.announced.add(key);
       out.push({
@@ -212,6 +244,10 @@ export class AlertEngine {
   ): Promise<number> {
     if (!this.store.available) return 0;
     const now = Date.now();
+
+    for (const game of snapshot.upcoming) {
+      if (game.anticipation !== null) this.anticipation.set(game.id, game.anticipation);
+    }
 
     // Pushes are about to go out, which is exactly when a dead subscription would
     // take another one into the void, so it is also when to drop it.
@@ -280,15 +316,31 @@ function quarter(period: number): string {
   return `in the ${period}${suffix}`;
 }
 
+/** `#5 Oregon at Oklahoma State`, with ranks only where a poll exists. */
+function matchupWithRanks(game: Game): string {
+  const side = (team: Game["home"]) => (team.rank ? `#${team.rank} ${team.name}` : team.name);
+  return `${side(game.away)} at ${side(game.home)}`;
+}
+
+/** The closing line as the board shows it, e.g. `MICH -3.5`. */
+function lineLabel(game: Game): string {
+  if (game.pregameOdds) return game.pregameOdds;
+  if (game.pregameSpread === null || game.pregameSpread === 0) return "";
+  const favorite = game.pregameSpread < 0 ? game.home : game.away;
+  return `${favorite.abbrev} -${Math.abs(game.pregameSpread)}`;
+}
+
 function detail(alert: Alert): string {
   const game = alert.game;
   const network = game.broadcast ? ` · ${game.broadcast}` : "";
   if (alert.category === "kickoff" || alert.category === "primetime") {
-    // "Kicking off now" only repeats the title. What is actually useful before a
-    // game is how good it is expected to be, and that matters most for the
-    // primetime alert, whose whole premise is that the only game on might be a
-    // bad one. Saying so is the point.
-    return `${expectation(alert.score)} · rated ${Math.round(alert.score)}${network}`;
+    // "Kicking off now" only repeats the title. What is useful before a game is
+    // how good it is expected to be, which matters most for the primetime alert,
+    // whose whole premise is that the only game on might be a bad one. The line
+    // earns its place for the same reason: the board shows it on every row, so a
+    // notification without it asks someone to open the app to learn what it knew.
+    const line = lineLabel(game);
+    return `${expectation(alert.score)} · rated ${Math.round(alert.score)}${line ? ` · ${line}` : ""}${network}`;
   }
   return `${game.away.abbrev} ${game.away.score}, ${game.home.abbrev} ${game.home.score} · ${game.clock} ${quarter(game.period)}${network}`;
 }
@@ -296,7 +348,9 @@ function detail(alert: Alert): string {
 export function buildPayload(alerts: Alert[]): unknown {
   const lead = alerts[0];
   const game = lead.game;
-  const matchup = `${game.away.name} at ${game.home.name}`;
+  // Ranks belong in the title, where the matchup is named. College is the only
+  // league with a poll, so `team.rank` is simply absent for the NFL.
+  const matchup = matchupWithRanks(game);
 
   /*
    * How many other games are on picks the wording, never whether to send. Making

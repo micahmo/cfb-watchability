@@ -38,6 +38,21 @@ export function kickoffDay(iso: string): string {
   return sameDay ? "Today" : d.toLocaleDateString([], { weekday: "short" });
 }
 
+/**
+ * When a game was played, for the recap.
+ *
+ * ESPN publishes no end time, only a start and a `Final` status, so a finished
+ * card says when the game kicked off rather than when it ended. The day is only
+ * shown when it is not today, since the recap reaches back eighteen hours and
+ * most of what it holds is from this afternoon.
+ */
+export function kickoffWhen(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const sameDay = d.toDateString() === new Date().toDateString();
+  return sameDay ? kickoffTime(iso) : `${kickoffDay(iso)} ${kickoffTime(iso)}`;
+}
+
 export function relativeTime(iso: string): string {
   const then = Date.parse(iso);
   if (!Number.isFinite(then)) return "never";

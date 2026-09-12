@@ -403,7 +403,7 @@
                  header should sit in whitespace, not inside a cell. -->
             <div class="tier">
               {#each day.available as game (game.id)}
-                <UpcomingRow {game} score={anticipationOf(game)} />
+                <UpcomingRow {game} score={anticipationOf(game)} {now} />
               {/each}
             </div>
             {#if day.unavailable.length > 0}
@@ -415,7 +415,7 @@
                   </svg>
                 </p>
                 {#each day.unavailable as game (game.id)}
-                  <UpcomingRow {game} score={anticipationOf(game)} />
+                  <UpcomingRow {game} score={anticipationOf(game)} {now} />
                 {/each}
               </div>
             {/if}
