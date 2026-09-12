@@ -72,6 +72,19 @@ const MAX_LINE_LOOKUPS_PER_POLL = 4;
 const PATCH_COALESCE_MS = 1000;
 /** How long a missing situation may be filled in from the last one seen. */
 const SITUATION_CARRY_MS = 4 * 60 * 1000;
+/**
+ * How long a missing win probability may be filled in from the last one seen.
+ *
+ * Shorter than the situation carry and, unlike it, not abandoned when the score
+ * changes. The two fields go stale differently. A carried "3rd & 6" after a
+ * touchdown is precisely wrong, so it is dropped; a carried win probability is
+ * only approximately wrong, and the alternative is very much worse. Without it
+ * `tensionScore` falls back to a margin curve which disagrees with the real number
+ * violently: 0-0 in a mismatch reads as perfectly close on margin and 0.99 on
+ * probability, so a game sat at 19.6, dropped to 7.6 and came back with nothing
+ * about it having changed but whether ESPN was sending the field.
+ */
+const WIN_PROB_CARRY_MS = 90 * 1000;
 
 function yyyymmdd(d: Date): string {
   return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
@@ -89,6 +102,31 @@ function liveDateRange(): string {
   const now = new Date();
   const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
   return `${yyyymmdd(yesterday)}-${yyyymmdd(now)}`;
+}
+
+/** Where a scoreboard document has got to, for comparing two of them. */
+function progressOf(event: any): { period: number; clock: number; points: number } {
+  const comp = event?.competitions?.[0];
+  const status = event?.status ?? comp?.status ?? {};
+  const scores = (comp?.competitors ?? []).map((c: any) => Number(c?.score));
+  return {
+    period: Number(status?.period) || 0,
+    clock: Number(status?.clock) || 0,
+    points: scores.reduce((a: number, b: number) => a + (Number.isFinite(b) ? b : 0), 0),
+  };
+}
+
+/**
+ * Whether `candidate` describes an earlier moment of the game than `held`.
+ *
+ * The two-second tolerance on the clock is for rounding between sources, not for
+ * doubt: a real clock never climbs inside a period.
+ */
+function isBehind(candidate: any, held: any): boolean {
+  const a = progressOf(candidate);
+  const b = progressOf(held);
+  if (a.period !== b.period) return a.period < b.period;
+  return a.clock > b.clock + 2 || a.points < b.points;
 }
 
 /** Local calendar day, matching how the client groups the planning list. */
@@ -151,6 +189,8 @@ export class LeaguePoller {
    * sometimes landed inside a gap, while this sees every removal the moment it
    * happens and the card visibly flickers.
    */
+  /** The last win probability seen per game, carried on its own terms. */
+  private lastWinProb = new Map<string, { at: number; value: number }>();
   private lastSituation = new Map<
     string,
     {
@@ -430,11 +470,37 @@ export class LeaguePoller {
       await this.enrich?.(games);
       const now = Date.now();
 
-      // Replaced wholesale rather than merged, so a game that has dropped out of
-      // the window stops being patched and a new one starts.
-      this.rawEvents = new Map(
-        events.filter((e: any) => typeof e?.uid === "string").map((e: any) => [e.uid, e]),
-      );
+      /*
+       * Replaced, but never rewound.
+       *
+       * The scoreboard lags the push feed, so replacing wholesale meant every poll
+       * rolled the board back to whatever REST happened to know. Measured on a live
+       * slate: six scores went backwards in ninety seconds, 27-21, 23-17, 20-14,
+       * and one clock jumped from three seconds remaining to 723, all of it at
+       * thirty-second intervals, which is the poll.
+       *
+       * So a polled document is taken unless it is demonstrably behind the one
+       * already held. Game state only moves one way: periods climb, the clock falls
+       * within a period, points never drop. Anything failing that is stale and the
+       * patched document stands, and as soon as REST catches up it is accepted
+       * again, which is what keeps the poll able to heal a missed patch.
+       */
+      const fresh = new Map<string, any>();
+      let rewound = 0;
+      for (const event of events) {
+        if (typeof event?.uid !== "string") continue;
+        const held = this.rawEvents.get(event.uid);
+        if (held !== undefined && isBehind(event, held)) {
+          fresh.set(event.uid, held);
+          rewound += 1;
+        } else {
+          fresh.set(event.uid, event);
+        }
+      }
+      this.rawEvents = fresh;
+      if (rewound > 0) {
+        console.log(`[${this.tag()}] kept ${rewound} pushed game(s) the poll would have rewound`);
+      }
       this.season = season;
       this.week = week;
 
@@ -498,6 +564,16 @@ export class LeaguePoller {
   private carrySituation(games: RawGame[], now: number): void {
     for (const game of games) {
       if (game.state !== "in") continue;
+
+      /* Win probability first and separately: ESPN drops it on its own, with the
+         rest of the situation still present, in about one live sample in eleven. */
+      if (game.homeWinProb !== null) {
+        this.lastWinProb.set(game.id, { at: now, value: game.homeWinProb });
+      } else {
+        const held = this.lastWinProb.get(game.id);
+        if (held && now - held.at <= WIN_PROB_CARRY_MS) game.homeWinProb = held.value;
+      }
+
       const score = `${game.away.score}-${game.home.score}`;
       const present = game.homeWinProb !== null || game.lastPlay !== null;
 

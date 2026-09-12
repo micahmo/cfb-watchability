@@ -457,6 +457,40 @@ the number is an expectation, and calling both "rated" is what made the notifica
 look like they disagreed when the board had simply switched that game to its live rating the moment
 it started.
 
+## The poll was rewinding the push feed
+
+Every thirty seconds the board went backwards. Measured on a live slate: six scores rolled back in
+ninety seconds, 27-21, 23-17, 20-14, and one clock jumped from three seconds remaining to 723. The
+regressions clustered exactly at the poll interval, which is what named the cause.
+
+`poll()` replaced the held documents wholesale, and the REST scoreboard lags the push feed by a few
+seconds. So each poll overwrote everything the stream had advanced since the fetch began, and the
+next push put it back: a score appearing, vanishing, and returning, which is what a viewer sees.
+
+A polled document is now taken unless it is demonstrably behind the one already held. Game state
+only moves one way, so the test is direct: periods climb, the clock falls within a period, points
+never drop. Anything failing that is stale and the pushed document stands. As soon as REST catches
+up it is accepted again, which is what keeps polling able to heal a patch that went missing, and it
+logs when it refuses so the frequency is visible rather than guessed at.
+
+### Win probability needs its own carry
+
+The situation carry fills a gap only when the *whole* block is absent, which is right for possession
+and down and distance: those are either there or the play has not started. Win probability is not
+like that. Measured across 690 live samples, it went missing on its own, with the last play still
+present, in 62 of them, about one in eleven, and the all-or-nothing rule did not cover a single one.
+
+The cost is not cosmetic, because `tensionScore` falls back to a margin curve without it and the two
+disagree violently. A scoreless first quarter reads as perfectly close on margin and 0.99 on
+probability, so one game sat at 19.6, fell to 7.6 and came back with nothing changed but whether
+ESPN was sending the field; another moved 11.7 points with a probability step of exactly zero.
+
+So it carries separately, for ninety seconds, and *not* abandoned when the score changes, which is
+the opposite of the rule for the rest of the block. The two go stale differently: a carried "3rd & 6"
+after a touchdown is precisely wrong, while a carried win probability is only approximately wrong,
+and the alternative is a fallback that disagrees by nine tenths. Measured after: three losses in
+ninety seconds became none.
+
 ## A faster feed changed what an old metric meant
 
 `RECENT SWINGS` appeared on two 0-0 games at once. The tag reads `swing`, which was the **cumulative
