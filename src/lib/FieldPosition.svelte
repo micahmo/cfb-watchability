@@ -82,7 +82,16 @@
      dot; taller than this and it was the original complaint again. */
   const HEAD_LEN = 3.2;
   const HEAD_HALF = 2;
-  /** Shortest line worth drawing. Below this the arrow is a caret and nothing else. */
+  /**
+   * Shortest line worth drawing, measured in the direction of play.
+   *
+   * Signed rather than absolute, which is the whole point. The head reserves
+   * `GAP + HEAD_LEN` behind the ball, so on a drive shorter than that the head
+   * lands *behind* its own start and the tail has to run backwards to reach it.
+   * An absolute distance reads that as a perfectly good arrow: seen live, a
+   * three-yard drive produced a tail of 3.6 units pointing the wrong way, drawn
+   * underneath a head 3.2 long, which on a phone is a caret and no line at all.
+   */
   const MIN_TAIL = 2.5;
 
   /**
@@ -104,7 +113,7 @@
     const back = tip - dir * HEAD_LEN;
     const tail = x(drive);
     if ([tip, back, tail].some((at) => at < EZ || at > EZ + 100)) return null;
-    if (Math.abs(back - tail) < MIN_TAIL) return null;
+    if (dir * (back - tail) < MIN_TAIL) return null;
     return { dir, tip, back, tail };
   });
 
