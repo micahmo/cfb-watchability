@@ -66,6 +66,45 @@
   const x = (yard: number) => EZ + yard;
 
   /**
+   * The arrow, always behind the ball and pointing at it.
+   *
+   * Drawing the head *ahead* of the ball, which the no-drive fallback used to do,
+   * put it in the end zone whenever the ball was near the goal line and, worse,
+   * dropped it between the line of scrimmage and the line to gain, where it read as
+   * a third marker rather than as direction. Behind the ball it can do neither: the
+   * tip sits just off the ball and everything else trails away from the end zone
+   * being attacked.
+   */
+  const GAP = 3.4;
+  const HEAD_LEN = 2.2;
+  const HEAD_HALF = 1.3;
+  /** Shortest line worth drawing. Below this the arrow is a caret and nothing else. */
+  const MIN_TAIL = 2.5;
+
+  /**
+   * Two rules, and the arrow is simply absent whenever either fails.
+   *
+   * It is drawn only when there is a real drive long enough to show as a line: a
+   * bare caret floating beside the ball says nothing a reader can use, and every
+   * attempt to place one sensibly ran into an end zone or a first-down line. And
+   * nothing is ever clamped into position. Clamping produced marks that looked
+   * deliberate while sitting somewhere the ball has not been, which is the same
+   * fault as a stale field, so if the whole arrow does not fit on the grass there
+   * is no arrow.
+   */
+  const arrow = $derived.by(() => {
+    if (situation === null || drive === null) return null;
+    const dir = towardHundred ? 1 : -1;
+    const ball = x(situation.yardLine);
+    const tip = ball - dir * GAP;
+    const back = tip - dir * HEAD_LEN;
+    const tail = x(drive);
+    if ([tip, back, tail].some((at) => at < EZ || at > EZ + 100)) return null;
+    if (Math.abs(back - tail) < MIN_TAIL) return null;
+    return { dir, tip, back, tail };
+  });
+
+  /**
    * Yard numbers every ten, as a real field is painted, minus the ones the two
    * lines are standing on.
    *
@@ -122,25 +161,13 @@
     {/if}
     <line x1={x(situation.yardLine)} y1="0" x2={x(situation.yardLine)} y2={H} class="scrimmage" />
 
-    <!-- The drive, tail at its start and head at the ball, so the arrow is behind
-         the ball rather than in front of it and its length is the ground gained. -->
-    {#if drive !== null}
-      <path
-        class="arrow"
-        d={`M ${x(drive)} ${H / 2} H ${x(situation.yardLine) + (towardHundred ? -3.8 : 3.8)}`}
-      />
+    <!-- Tail at the drive start where there is one, head always just behind the
+         ball, so the length of the line is the ground this drive has made. -->
+    {#if arrow !== null}
+      <path class="arrow" d={`M ${arrow.tail} ${H / 2} H ${arrow.back}`} />
       <path
         class="arrow head"
-        d={towardHundred
-          ? `M ${x(situation.yardLine) - 6.6} ${H / 2 - 2.4} l 2.8 2.4 l -2.8 2.4`
-          : `M ${x(situation.yardLine) + 6.6} ${H / 2 - 2.4} l -2.8 2.4 l 2.8 2.4`}
-      />
-    {:else}
-      <path
-        class="arrow head"
-        d={towardHundred
-          ? `M ${x(situation.yardLine) + 4} ${H / 2 - 2.4} l 2.8 2.4 l -2.8 2.4`
-          : `M ${x(situation.yardLine) - 4} ${H / 2 - 2.4} l -2.8 2.4 l 2.8 2.4`}
+        d={`M ${arrow.tip - arrow.dir * HEAD_LEN} ${H / 2 - HEAD_HALF} L ${arrow.tip} ${H / 2} L ${arrow.tip - arrow.dir * HEAD_LEN} ${H / 2 + HEAD_HALF}`}
       />
     {/if}
 
@@ -190,16 +217,15 @@
     stroke: rgba(0, 0, 0, 0.55);
     stroke-width: 0.5;
   }
+  /* One opacity for both halves. Two made the caret read as a lighter colour than
+     the line it belongs to, as though it were a separate mark. */
   .arrow {
     fill: none;
     stroke: var(--text);
     stroke-width: 1;
     stroke-linecap: round;
     stroke-linejoin: round;
-    opacity: 0.55;
-  }
-  .arrow.head {
-    opacity: 0.8;
+    opacity: 0.6;
   }
   .yard-num {
     fill: var(--text-faint);

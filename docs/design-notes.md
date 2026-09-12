@@ -446,6 +446,28 @@ is worse than no picture:
   When the start is not behind the ball, it falls back to a stub showing direction only.
 - **No field-goal range.** It is not derivable and would be invention.
 
+### The arrow is drawn whole or not at all
+
+Four faults, reported within minutes of it going live, and three shared a cause. The caret was
+drawn *ahead* of the ball when there was no drive to show, which put it in the end zone near a goal
+line and dropped it between the scrimmage and the line to gain whenever the distance was short. It
+belongs behind the ball: it marks how far the drive has come, not where the next play is going.
+
+Trying to keep it in bounds by clamping was the wrong instinct, and the sweep caught it doing the
+same thing again from the other side, the back of the caret landing in a team's own end zone from
+about its two-yard line. A clamped mark looks deliberate while sitting somewhere the ball has not
+been, which is the stale-field fault wearing a different hat. So there is no clamping: **if the whole
+arrow does not fit on the grass, there is no arrow**, and equally there is none without a real drive
+long enough to show as a line, since a bare caret beside the ball tells a reader nothing.
+
+Checked by sweeping every combination of ball position, direction, distance to gain and drive start:
+11,400 arrows drawn, 1,200 refused, none in an end zone, past the line to gain or between the two
+lines.
+
+The last fault was cosmetic and had two causes: the caret carried a different opacity from its own
+line, so it read as a lighter colour and a separate mark, and the line ran underneath it, so it
+showed through. One opacity now, and the line stops where the caret begins.
+
 Yard numbers sit every ten, as a real field is painted, minus whichever ones the two lines are
 standing on. Every twenty was tried first and read as a fault rather than a choice: with the forty
 and the fifty both suppressed the row jumped from 40 to 20, where a 30 and a 10 would have fitted.
