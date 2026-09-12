@@ -107,6 +107,20 @@ finished game uses a third, more forgiving curve, because the question for a fin
 a good one", not "can it still change". At 0:00 the live curve writes off any two-score game,
 which rated a 27-34 finish a 10.
 
+The **display** had no such fallback, so the probability bar, possession, down and distance and the
+last play all vanished together and came back. The push feed is what made that obvious: a
+thirty-second poll only sometimes landed inside a gap, while the stream shows every removal the
+instant it happens. So the last situation is held and filled back in, with three rules that keep it
+from inventing anything.
+
+It only fills when the **whole** block is gone. Down and distance alone going absent is ordinary
+football, between possessions or on a kickoff, and carrying "3rd & 6" across a punt would state
+something false; a win probability or a last play still being there is what says the block is
+present and the missing down is real. It expires after four minutes, because a probability from
+that long ago is no longer about this game. And it is dropped the instant the score changes, since
+a touchdown moves the probability, flips possession, resets the down and makes the last play the
+scoring play, so everything held goes stale together.
+
 ## Tags must not promise more than the number supports
 
 Three renames, all the same mistake:

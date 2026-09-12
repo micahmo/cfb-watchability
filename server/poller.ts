@@ -70,6 +70,8 @@ const MAX_LINE_LOOKUPS_PER_POLL = 4;
  * an order of magnitude fresher than the thirty-second poll it replaces.
  */
 const PATCH_COALESCE_MS = 1000;
+/** How long a missing situation may be filled in from the last one seen. */
+const SITUATION_CARRY_MS = 4 * 60 * 1000;
 
 function yyyymmdd(d: Date): string {
   return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
@@ -140,6 +142,27 @@ export class LeaguePoller {
    * pushed update goes through exactly the same scoring as a polled one.
    */
   private rawEvents = new Map<string, any>();
+  /**
+   * The last live situation seen for a game, so a gap in it does not blank the card.
+   *
+   * ESPN drops `situation` for stretches of a live game, taking win probability,
+   * possession, down and distance and the last play with it. That has always been
+   * true; the push feed made it conspicuous, because a thirty-second poll only
+   * sometimes landed inside a gap, while this sees every removal the moment it
+   * happens and the card visibly flickers.
+   */
+  private lastSituation = new Map<
+    string,
+    {
+      at: number;
+      score: string;
+      homeWinProb: number | null;
+      possessionTeamId: string | null;
+      downDistance: string | null;
+      isRedZone: boolean;
+      lastPlay: string | null;
+    }
+  >();
   private season: number | null = null;
   private week: number | null = null;
   private fastcast: FastcastClient | null = null;
@@ -454,7 +477,51 @@ export class LeaguePoller {
    * burst, and a line lookup or standings refresh in here would turn a websocket
    * message into an outbound request.
    */
+  /**
+   * Fills a missing situation from the last one seen, within limits.
+   *
+   * Only when the *whole* block is gone. Down and distance alone going absent is
+   * ordinary football, between possessions or on a kickoff, and carrying "3rd & 6"
+   * across a punt would invent a fact. The presence of a win probability or a last
+   * play is what says the block is there and the missing down is real.
+   *
+   * Two guards on the carry itself, because a wrong value is worse than a blank
+   * one. It expires, since a win probability from four minutes ago is no longer
+   * about this game. And it is dropped the moment the score changes: a touchdown
+   * moves the probability, flips possession, resets the down and makes the last
+   * play the scoring play, so everything held is stale in the same instant.
+   */
+  private carrySituation(games: RawGame[], now: number): void {
+    for (const game of games) {
+      if (game.state !== "in") continue;
+      const score = `${game.away.score}-${game.home.score}`;
+      const present = game.homeWinProb !== null || game.lastPlay !== null;
+
+      if (present) {
+        this.lastSituation.set(game.id, {
+          at: now,
+          score,
+          homeWinProb: game.homeWinProb,
+          possessionTeamId: game.possessionTeamId,
+          downDistance: game.downDistance,
+          isRedZone: game.isRedZone,
+          lastPlay: game.lastPlay,
+        });
+        continue;
+      }
+
+      const held = this.lastSituation.get(game.id);
+      if (!held || held.score !== score || now - held.at > SITUATION_CARRY_MS) continue;
+      game.homeWinProb = held.homeWinProb;
+      game.possessionTeamId = held.possessionTeamId;
+      game.downDistance = held.downDistance;
+      game.isRedZone = held.isRedZone;
+      game.lastPlay = held.lastPlay;
+    }
+  }
+
   private compose(games: RawGame[], now: number, note = ""): void {
+    this.carrySituation(games, now);
     for (const raw of games) {
       if (raw.state === "in") this.swings.record(raw.id, raw.homeWinProb, now);
     }

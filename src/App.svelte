@@ -37,6 +37,19 @@
    * every other card and ignores a tap is just a dead target.
    */
   let openCards = $state<Record<string, boolean>>({});
+  /**
+   * The game the viewer folded away *while it was the hero*, if any.
+   *
+   * Held apart from `openCards` because the hero slot and the list below default
+   * the opposite ways, open and closed, while both key off the game id. Sharing
+   * one map meant folding a game down in the list and then watching it climb to
+   * the top produced a folded hero: the old explicit "closed" travelled with the
+   * game into a slot whose whole point is that it starts open. Keyed by id rather
+   * than a bare flag so that when a different game takes the top slot it opens,
+   * which is the useful behaviour when the board has just changed its mind about
+   * what you should be watching.
+   */
+  let heroFolded = $state<string | null>(null);
   let showAllLive = $state(false);
   let showAllRecent = $state(false);
   const cardOpen = (id: string, fallback: boolean) => openCards[id] ?? fallback;
@@ -336,8 +349,8 @@
       game={top}
       score={scoreOf(top)}
       collapsible
-      expanded={cardOpen(top.id, true)}
-      ontoggle={() => toggleCard(top.id, true)}
+      expanded={heroFolded !== top.id}
+      ontoggle={() => (heroFolded = heroFolded === top.id ? null : top.id)}
     />
   </section>
 {/if}
