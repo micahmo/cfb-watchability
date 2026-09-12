@@ -90,9 +90,24 @@ backwards for a label meaning "something unlikely is happening".
 So the tag needs a real underdog, at ten points or more, whatever the score is doing. A 6.5-point
 dog leading is not unlikely, it happens every week, and you can only upset somebody who was actually
 favoured. The notification path has always had this floor, at six, in `upsetTensionScore`; the tag
-had none, which is why the board and the alerts disagreed about what counted. Reasoned rather than
-measured, unlike the shootout thresholds: closing lines vanish from the scoreboard at kickoff, so
-checking it against a season of finals would need a summary fetch per game. **Fitted to five live games, though**, which is a handful and
+had none, which is why the board and the alerts disagreed about what counted.
+
+**Measured, after first claiming it could not be.** Closing lines do vanish from the scoreboard at
+kickoff, which is true and is why `backfillLines` exists, but they survive in `pickcenter` on the
+summary endpoint, which this project has relied on from the beginning and which the upset section
+above already says. Asserting otherwise, in a paragraph that described the workaround, was simply
+forgetting the project's own notes.
+
+So: 315 finished college games, 68 carrying a closing line. Without a floor the tag fires on five,
+and two of those are **1.5-point lines**, including a 1.5-point favourite losing 49-14 that the
+scoring rated a maximal upset because the margin was large. A toss-up ending in a blowout is a
+blowout, not a surprise. The floor sits on a plateau and not a cliff: no game that fires the tag has
+a line between 1.5 and 13.5, so any floor from 3 to 12 is the same answer. What survives is a
+13.5-point underdog, a 15.5 and a 20.5, all genuine.
+
+The 247 games with no line at all are not a failure to fetch, which was checked with retries until
+nothing failed. Most college games simply have no market, and those fall through to the rank
+comparison, which is what it is there for. **Fitted to five live games, though**, which is a handful and
 not a calibration set. The direction is principled and the constants are not yet earned; they want
 checking against a season of in-game states the way the shootout thresholds were.
 

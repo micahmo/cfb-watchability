@@ -165,9 +165,14 @@
          ball, so the length of the line is the ground this drive has made. -->
     {#if arrow !== null}
       <path class="arrow" d={`M ${arrow.tail} ${H / 2} H ${arrow.back}`} />
+      <!-- Filled and closed, not an open chevron. Open, the line stopped at the
+           mouth of the V and left a stroke-free gap along the middle to the point;
+           overlapping them instead showed the line through the caret, since both
+           are drawn semi-transparent. A solid triangle has a flat back edge for the
+           line to meet, so there is neither gap nor show-through. -->
       <path
         class="arrow head"
-        d={`M ${arrow.tip - arrow.dir * HEAD_LEN} ${H / 2 - HEAD_HALF} L ${arrow.tip} ${H / 2} L ${arrow.tip - arrow.dir * HEAD_LEN} ${H / 2 + HEAD_HALF}`}
+        d={`M ${arrow.back} ${H / 2 - HEAD_HALF} L ${arrow.tip} ${H / 2} L ${arrow.back} ${H / 2 + HEAD_HALF} Z`}
       />
     {/if}
 
@@ -223,9 +228,15 @@
     fill: none;
     stroke: var(--text);
     stroke-width: 1;
-    stroke-linecap: round;
+    /* Butt, not round: a round cap overruns the join by half the stroke and
+       double-darkens where it meets the head. */
+    stroke-linecap: butt;
     stroke-linejoin: round;
     opacity: 0.6;
+  }
+  .arrow.head {
+    fill: var(--text);
+    stroke: none;
   }
   .yard-num {
     fill: var(--text-faint);

@@ -509,9 +509,14 @@ const ONE_SCORE = 8;
  * tag had none, which is why the board and the alerts disagreed about what counted.
  * Ten rather than six because six still admits near coin flips.
  *
- * Reasoned rather than measured, unlike the shootout thresholds: closing lines are
- * absent from the scoreboard once a game kicks off, so checking this against a
- * season of finals would mean a summary fetch per game.
+ * Measured, on a summary fetch per game: 315 finished college games, 68 of which
+ * carry a closing line at all. Without a floor the tag fires on five of them and
+ * two are 1.5-point lines, one of them a 1.5-point favourite losing 49-14, which
+ * the old scoring rated a *maximal* upset because the margin was large. A toss-up
+ * ending in a blowout is a blowout. The floor sits on a plateau rather than a
+ * cliff: no game that fires the tag has a line between 1.5 and 13.5, so anything
+ * from 3 to 12 gives the identical answer, and what survives is a 13.5-point dog,
+ * a 15.5 and a 20.5, all of them real.
  */
 const UPSET_MIN_SPREAD = 10;
 /**
