@@ -1,7 +1,5 @@
 import type { ScoreComponents } from "./types.js";
 
-export type ProfileName = "balanced" | "bestGame" | "biggestGame";
-
 export interface Weights {
   primary: number;
   prominence: number;
@@ -12,23 +10,22 @@ export interface Weights {
 }
 
 /**
- * Each profile sums to 1, so a total is always 0..100 and profiles stay
- * comparable. "How close is it" versus "how much does it matter" is a taste
- * question, so it is a dial rather than a fixed answer.
+ * Sums to 1, so a total is always 0..100.
+ *
+ * One fixed weighting. Three selectable profiles shipped for a while, trading
+ * closeness against prominence, and were removed: measured against a full
+ * Saturday of finished games the top-ranked game was identical under all three,
+ * nothing moved more than two positions, and a control that cannot change the
+ * answer is not a control.
  */
-export const PROFILES: Record<ProfileName, Weights> = {
-  bestGame: { primary: 0.74, prominence: 0.04, swing: 0.09, upset: 0.06, stakes: 0.03, pace: 0.04 },
-  balanced: { primary: 0.58, prominence: 0.18, swing: 0.08, upset: 0.07, stakes: 0.05, pace: 0.04 },
-  biggestGame: { primary: 0.42, prominence: 0.36, swing: 0.06, upset: 0.06, stakes: 0.06, pace: 0.04 },
+export const WEIGHTS: Weights = {
+  primary: 0.58,
+  prominence: 0.18,
+  swing: 0.08,
+  upset: 0.07,
+  stakes: 0.05,
+  pace: 0.04,
 };
-
-export const PROFILE_LABELS: Record<ProfileName, string> = {
-  bestGame: "Best game",
-  balanced: "Balanced",
-  biggestGame: "Biggest game",
-};
-
-export const DEFAULT_PROFILE: ProfileName = "balanced";
 
 export function combine(c: ScoreComponents, w: Weights, maxTotal: number | null = null): number {
   const raw =

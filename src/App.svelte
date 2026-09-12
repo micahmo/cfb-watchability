@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Game, League, Snapshot } from "../shared/types";
-  import { DEFAULT_PROFILE, PROFILES, combine } from "../shared/weights";
+  import { WEIGHTS, combine } from "../shared/weights";
   import { fetchSnapshot, openBoardStream } from "./lib/api";
   import { dayDate, dayKey, dayLabel, relativeTime, scoreColor } from "./lib/format";
   import { isFavorite, prefs, setUpcomingOrder } from "./lib/prefs.svelte";
@@ -167,7 +167,7 @@
     // under all three, nothing moved more than two places, and what movement
     // there was landed at positions nine through twelve. Tune these numbers
     // instead of asking the reader to.
-    const base = combine(game.score, PROFILES[DEFAULT_PROFILE], game.score.maxTotal);
+    const base = combine(game.score, WEIGHTS, game.score.maxTotal);
     return Math.min(100, base + favoriteBoost(game));
   }
 

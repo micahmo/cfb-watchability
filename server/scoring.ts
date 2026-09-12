@@ -1,5 +1,5 @@
 import type { Game, League, ScoreBreakdown, ScoreComponents, TeamSide } from "../shared/types.js";
-import { DEFAULT_PROFILE, PROFILES, combine } from "../shared/weights.js";
+import { WEIGHTS, combine } from "../shared/weights.js";
 import { prominenceScore } from "./prominence.js";
 
 const PERIOD_SECONDS = 900;
@@ -500,7 +500,7 @@ export function scoreGame(input: ScoreInputs): ScoreBreakdown {
     ...components,
     maxTotal,
     hasWinProb,
-    total: combine(components, PROFILES[DEFAULT_PROFILE], maxTotal),
+    total: combine(components, WEIGHTS, maxTotal),
   };
 }
 

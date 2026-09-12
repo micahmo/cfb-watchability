@@ -1,5 +1,5 @@
 import type { Game, League, Snapshot } from "../shared/types.js";
-import { PROFILES, combine, DEFAULT_PROFILE } from "../shared/weights.js";
+import { WEIGHTS, combine } from "../shared/weights.js";
 import type { Category, Subscription, SubscriptionStore } from "./subscriptions.js";
 
 /** Live score a game must reach to be worth interrupting somebody for. */
@@ -132,7 +132,7 @@ function favoriteBoost(game: Game, favorites: string[]): number {
 /** The same number the viewer sees on their own board, favorites included. */
 function boosted(game: Game, favorites: string[]): number {
   if (!game.score) return 0;
-  const base = combine(game.score, PROFILES[DEFAULT_PROFILE], game.score.maxTotal);
+  const base = combine(game.score, WEIGHTS, game.score.maxTotal);
   return Math.min(100, base + favoriteBoost(game, favorites));
 }
 
