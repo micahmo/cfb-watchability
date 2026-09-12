@@ -1,4 +1,11 @@
-import { RateLimitError, fetchPregameLine, fetchScoreboard, type RawGame } from "./espn.js";
+import {
+  RateLimitError,
+  fetchPregameLine,
+  fetchScoreboard,
+  normalizeEvents,
+  type RawGame,
+} from "./espn.js";
+import { FastcastClient, TOPICS, applyPatch, splitPath, type Patch } from "./fastcast.js";
 import { LineStore } from "./lines.js";
 import { anticipationScore, buildTags, scoreGame } from "./scoring.js";
 import { SwingStore } from "./store.js";
@@ -53,6 +60,16 @@ const MAX_UPCOMING_DAYS = 4;
 const MAX_RECENT = 12;
 /** Cap the one-off line lookups per poll so a full Saturday cannot burst. */
 const MAX_LINE_LOOKUPS_PER_POLL = 4;
+/**
+ * How long to gather pushes before rebuilding the board.
+ *
+ * Patches arrive in bursts, a dozen or more for a single play as ESPN updates the
+ * clock, the score, the drive and the situation in turn, and rebuilding on each
+ * one would re-score the whole slate a dozen times to land on the same answer.
+ * Waiting a second collapses a burst into one rebuild and still leaves the board
+ * an order of magnitude fresher than the thirty-second poll it replaces.
+ */
+const PATCH_COALESCE_MS = 1000;
 
 function yyyymmdd(d: Date): string {
   return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
@@ -114,7 +131,24 @@ export class LeaguePoller {
   private readonly swings = new SwingStore();
   private readonly lines = new LineStore();
   private scheduled: RawGame[] = [];
+  /**
+   * ESPN's own event documents, keyed by uid, which is what the push feed patches.
+   *
+   * The normalised `RawGame` view cannot be patched: a delta addresses a path
+   * inside ESPN's document, and normalising throws that structure away. So the
+   * raw document is kept and re-normalised after every burst, which also means a
+   * pushed update goes through exactly the same scoring as a polled one.
+   */
+  private rawEvents = new Map<string, any>();
+  private season: number | null = null;
+  private week: number | null = null;
+  private fastcast: FastcastClient | null = null;
+  private patchTimer: NodeJS.Timeout | null = null;
+  /** Patches applied since the last rebuild, for the log line. */
+  private patchesApplied = 0;
   private consecutiveFailures = 0;
+  private polling = false;
+  private lastPollAt = 0;
   /** Non-zero only while honouring an actual HTTP 429 from ESPN. */
   private rateLimitedUntil = 0;
 
@@ -148,6 +182,75 @@ export class LeaguePoller {
   start(): void {
     void this.pollSchedule().then(() => this.pollLoop());
     setInterval(() => void this.pollSchedule(), SCHEDULE_POLL_MS);
+
+    // Polling continues unchanged underneath this. The push feed only closes the
+    // gap between polls, so losing it costs freshness and nothing else.
+    this.fastcast = new FastcastClient(
+      TOPICS[this.league],
+      {
+        onPatches: (patches) => this.onPatches(patches),
+        // A gap in the stream leaves the held document wrong in ways no later
+        // patch corrects, because a patch carries only the field that changed.
+        // Skipped when a poll is running or has just run. Measured against the
+        // attempt rather than the resulting snapshot, because at startup the
+        // websocket connects while the first poll is still in flight and both
+        // would otherwise fetch the same slate.
+        onResync: () => {
+          if (this.polling || Date.now() - this.lastPollAt < POLL_MS) return;
+          void this.poll();
+        },
+      },
+      (message) => console.log(`[${this.tag()}] fastcast ${message}`),
+    );
+    this.fastcast.start();
+  }
+
+  /**
+   * Applies a burst of pushes to the held documents.
+   *
+   * Patches for games outside the current window are dropped on the floor: the
+   * topic carries every game in the league, and `rawEvents` holds only the ones
+   * this board is tracking, so an unknown uid is the normal filter rather than an
+   * error worth logging.
+   */
+  private onPatches(patches: Patch[]): void {
+    let applied = 0;
+    for (const patch of patches) {
+      const target = splitPath(patch.path);
+      if (target === null) continue;
+      const event = this.rawEvents.get(target.uid);
+      if (event === undefined) continue;
+      if (applyPatch(event, target.segments, patch.op, patch.value)) applied += 1;
+    }
+    if (applied === 0) return;
+
+    this.patchesApplied += applied;
+    if (this.patchTimer !== null) return;
+    this.patchTimer = setTimeout(() => {
+      this.patchTimer = null;
+      this.rebuildFromPatches();
+    }, PATCH_COALESCE_MS);
+    this.patchTimer.unref?.();
+  }
+
+  /** Re-normalises the patched documents and rescores, with no network at all. */
+  private rebuildFromPatches(): void {
+    const count = this.patchesApplied;
+    this.patchesApplied = 0;
+    try {
+      const games = normalizeEvents([...this.rawEvents.values()], this.league);
+      // Enrichment is a cached lookup, so this stays local; the standings refresh
+      // it might trigger is owned by the poll path.
+      void this.enrich?.(games);
+      for (const raw of games) this.lines.recordFromScoreboard(raw);
+      this.compose(games, Date.now(), ` push(${count})`);
+    } catch (err) {
+      // The next poll rebuilds from scratch regardless, so a bad burst costs one
+      // rebuild rather than the board.
+      console.error(
+        `[${this.tag()}] rebuild from pushes failed: ${err instanceof Error ? err.message : err}`,
+      );
+    }
   }
 
   health() {
@@ -281,14 +384,24 @@ export class LeaguePoller {
       console.log(`[${this.tag()}] poll skipped, still inside the rate-limit hold`);
       return;
     }
+    this.polling = true;
+    this.lastPollAt = Date.now();
     try {
-      const { games, season, week } = await fetchScoreboard({
+      const { games, season, week, events } = await fetchScoreboard({
         league: this.league,
         groups: GROUPS,
         dates: DATES ?? liveDateRange(),
       });
       await this.enrich?.(games);
       const now = Date.now();
+
+      // Replaced wholesale rather than merged, so a game that has dropped out of
+      // the window stops being patched and a new one starts.
+      this.rawEvents = new Map(
+        events.filter((e: any) => typeof e?.uid === "string").map((e: any) => [e.uid, e]),
+      );
+      this.season = season;
+      this.week = week;
 
       // Capture every line we see while a game is still pregame; the scoreboard
       // stops carrying odds the moment it kicks off.
@@ -305,56 +418,7 @@ export class LeaguePoller {
         ),
       );
 
-      for (const raw of games) {
-        if (raw.state === "in") this.swings.record(raw.id, raw.homeWinProb, now);
-      }
-      this.swings.prune(now);
-
-      const live = games
-        .filter((g) => g.state === "in")
-        .map((g) => this.withScore(g, this.swings.movement(g.id)))
-        .sort((a, b) => (b.score?.total ?? 0) - (a.score?.total ?? 0));
-
-      // Prefer the forward-looking fetch, falling back to whatever the current
-      // week's board happens to carry.
-      const upcomingSource =
-        this.scheduled.length > 0 ? this.scheduled : games.filter((g) => g.state === "pre");
-      const seen = new Set([...live, ...games.filter((g) => g.state === "post")].map((g) => g.id));
-      const upcoming = capPerDay(
-        upcomingSource
-          .filter((g) => !seen.has(g.id))
-          .map((g) => this.withAnticipation(g))
-          .sort((a, b) => (b.anticipation ?? 0) - (a.anticipation ?? 0)),
-      );
-
-      const recent = games
-        .filter((g) => g.state === "post" && now - Date.parse(g.startDate) < RECENT_WINDOW_MS)
-        .map((g) => this.withScore(g, this.swings.movement(g.id)))
-        .sort((a, b) => (b.score?.total ?? 0) - (a.score?.total ?? 0))
-        .slice(0, MAX_RECENT);
-
-      this.snapshot = {
-        league: this.league,
-        updatedAt: new Date(now).toISOString(),
-        season,
-        week,
-        live,
-        upcoming,
-        recent,
-        market: null,
-        build: null,
-        error: null,
-      };
-      // After the snapshot is in place, so anything reading it sees the new one.
-      try {
-        this.onSnapshot?.(this.snapshot);
-      } catch (err) {
-        console.error(`[${this.tag()}] snapshot hook failed: ${err instanceof Error ? err.message : err}`);
-      }
-      console.log(
-        `[${this.tag()}] ${new Date(now).toLocaleTimeString()} live=${live.length} upcoming=${upcoming.length} recent=${recent.length}` +
-          (live[0] ? ` top="${live[0].shortName}" ${live[0].score?.total}` : ""),
-      );
+      this.compose(games, now);
       this.consecutiveFailures = 0;
     } catch (err) {
       this.consecutiveFailures += 1;
@@ -368,7 +432,71 @@ export class LeaguePoller {
       console.error(
         `[${this.tag()}] poll failed (${this.consecutiveFailures} in a row): ${message}`,
       );
+    } finally {
+      this.polling = false;
     }
+  }
+
+  /**
+   * Builds a snapshot from normalised games and publishes it.
+   *
+   * Shared by the REST poll and the push feed, so a pushed update is scored by
+   * exactly the same code as a polled one rather than by a parallel path that
+   * could drift. Deliberately does no network: the push path runs this on every
+   * burst, and a line lookup or standings refresh in here would turn a websocket
+   * message into an outbound request.
+   */
+  private compose(games: RawGame[], now: number, note = ""): void {
+    for (const raw of games) {
+      if (raw.state === "in") this.swings.record(raw.id, raw.homeWinProb, now);
+    }
+    this.swings.prune(now);
+
+    const live = games
+      .filter((g) => g.state === "in")
+      .map((g) => this.withScore(g, this.swings.movement(g.id)))
+      .sort((a, b) => (b.score?.total ?? 0) - (a.score?.total ?? 0));
+
+    // Prefer the forward-looking fetch, falling back to whatever the current
+    // week's board happens to carry.
+    const upcomingSource =
+      this.scheduled.length > 0 ? this.scheduled : games.filter((g) => g.state === "pre");
+    const seen = new Set([...live, ...games.filter((g) => g.state === "post")].map((g) => g.id));
+    const upcoming = capPerDay(
+      upcomingSource
+        .filter((g) => !seen.has(g.id))
+        .map((g) => this.withAnticipation(g))
+        .sort((a, b) => (b.anticipation ?? 0) - (a.anticipation ?? 0)),
+    );
+
+    const recent = games
+      .filter((g) => g.state === "post" && now - Date.parse(g.startDate) < RECENT_WINDOW_MS)
+      .map((g) => this.withScore(g, this.swings.movement(g.id)))
+      .sort((a, b) => (b.score?.total ?? 0) - (a.score?.total ?? 0))
+      .slice(0, MAX_RECENT);
+
+    this.snapshot = {
+    league: this.league,
+    updatedAt: new Date(now).toISOString(),
+    season: this.season,
+    week: this.week,
+    live,
+    upcoming,
+    recent,
+    market: null,
+    build: null,
+    error: null,
+    };
+    // After the snapshot is in place, so anything reading it sees the new one.
+    try {
+    this.onSnapshot?.(this.snapshot);
+    } catch (err) {
+    console.error(`[${this.tag()}] snapshot hook failed: ${err instanceof Error ? err.message : err}`);
+    }
+    console.log(
+    `[${this.tag()}] ${new Date(now).toLocaleTimeString()}${note} live=${live.length} upcoming=${upcoming.length} recent=${recent.length}` +
+      (live[0] ? ` top="${live[0].shortName}" ${live[0].score?.total}` : ""),
+    );
   }
 
   /**

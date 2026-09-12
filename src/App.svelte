@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Game, League, Snapshot } from "../shared/types";
   import { DEFAULT_PROFILE, PROFILES, combine } from "../shared/weights";
-  import { fetchSnapshot } from "./lib/api";
+  import { fetchSnapshot, openBoardStream } from "./lib/api";
   import { dayDate, dayKey, dayLabel, relativeTime, scoreColor } from "./lib/format";
   import { isFavorite, prefs, setUpcomingOrder } from "./lib/prefs.svelte";
   import LeagueTabs from "./lib/LeagueTabs.svelte";
@@ -101,8 +101,23 @@
     snapshot = null;
     loading = true;
     void refresh(league);
+
+    /* The stream is the fast path and the poll is the floor. Keeping both means a
+       proxy that buffers event streams, or a browser without EventSource, costs
+       freshness rather than the board, and the poll is also what repairs a stream
+       that reconnected having missed something. */
+    const stop = openBoardStream(league, prefs.zip, prefs.marketOff, (next) => {
+      if (next.league !== prefs.league) return;
+      snapshot = next;
+      loadError = null;
+      loading = false;
+      now = Date.now();
+    });
     const poll = setInterval(() => void refresh(league), REFRESH_MS);
-    return () => clearInterval(poll);
+    return () => {
+      stop();
+      clearInterval(poll);
+    };
   });
 
   $effect(() => {

@@ -637,9 +637,42 @@ That makes the shape obvious, and it is what ESPN's own site does: fetch the sco
 initial state, subscribe, apply patches, re-score. It would take the live board from roughly fifty
 seconds stale to a couple of seconds.
 
-Not yet built. What it needs beyond the client itself: answering pings, re-fetching over REST on
-reconnect to resync, and keeping REST polling anyway for odds, standings and the schedule, none of
-which come down this feed.
+Now built, together with SSE, because either both or neither. The chain is: a patch arrives, it is
+applied to ESPN's own document, that document is re-normalised and re-scored, and the new board is
+pushed to every open client.
+
+**The raw document had to be kept.** `fetchScoreboard` normalised and threw ESPN's structure away,
+and patch paths address fields inside exactly that structure, so there was nothing to apply a delta
+to. The poller now holds the events by uid and re-normalises after each burst, which also means a
+pushed update is scored by the same code as a polled one rather than by a parallel path that could
+drift.
+
+**Bursts are coalesced.** A single play produces a dozen patches as the clock, score, drive and
+situation update in turn, and rebuilding on each would re-score the slate a dozen times to reach the
+same answer. One second of gathering collapses that, and is still an order of magnitude fresher than
+the poll it sits on top of.
+
+**Polling stays, and is the floor.** REST still owns odds, standings and the schedule, none of which
+come down this feed, and it repairs anything a dropped stream missed. Every reconnection forces a
+resync for that reason: a patch carries only the field that changed, so a gap leaves the held
+document wrong in ways no later patch corrects. That resync is skipped while a poll is already in
+flight, since at startup the socket connects mid-poll and both would fetch the same slate.
+
+Measured on a quiet night: `push(5)` and `push(1)` rebuilds arriving between polls, and a client
+holding a stream open received four boards in a hundred seconds, two of them seven seconds apart.
+
+### What the numbers actually are
+
+The client polled every 20 seconds and the server every 30, so worst case a score was 50 seconds old.
+FastCast alone would have made the server fresh within a second while leaving the client's 20-second
+poll as the new ceiling, which is why it was never worth building on its own. With both, a play
+reaches an open board in about a second.
+
+The stream carries the build id exactly as a poll does, so the update prompt keeps working off a
+direct comparison rather than off a reconnection. Who's Home does the same thing in the other
+direction: it treats a reconnect purely as a cue to re-run its bundle check, never as the answer.
+A reconnect is evidence of a restart, not proof of a deploy, and a sleeping phone produces one
+without anything having shipped.
 
 ### What a second capture, against live football, added
 

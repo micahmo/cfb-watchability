@@ -64,10 +64,87 @@ const alerts = new AlertEngine(subscriptions);
 
 /** Each league polls independently, so a quiet NFL week cannot slow a busy Saturday. */
 /**
+ * Everything about a request that changes what the board looks like.
+ *
+ * Captured once so a streaming connection can keep answering as that viewer
+ * without holding on to the request itself, and so the stream and the polled
+ * endpoint cannot drift into showing different boards.
+ */
+interface Viewer {
+  league: League;
+  zip: string | null;
+  /** True when the postal code was detected rather than typed. */
+  detected: boolean;
+  city: string | null;
+}
+
+function viewerFor(raw: string, req: http.IncomingMessage): Viewer {
+  const league = leagueFrom(raw);
+  const chosen = zipFrom(raw);
+  const optedOut = new URL(raw, "http://localhost").searchParams.get("market") === "off";
+  const detected = optedOut ? null : detectedZip(req);
+  return {
+    league,
+    zip: optedOut ? null : (chosen ?? detected),
+    detected: chosen === null,
+    city: chosen === null && !optedOut ? detectedCity(req) : null,
+  };
+}
+
+/** The board as one viewer sees it, market annotations included. */
+function resolveView(viewer: Viewer, base: Snapshot): Promise<Snapshot> {
+  // Only the NFL splits a slate by market; college games are on cable.
+  if (viewer.zip === null || viewer.league !== "nfl") return Promise.resolve(base);
+  return Promise.race([
+    withMarket(base, viewer.zip, viewer.detected, viewer.city),
+    new Promise<Snapshot>((resolve) => setTimeout(() => resolve(base), MARKET_BUDGET_MS)),
+  ]).catch((err) => {
+    console.error(`[http] market lookup failed: ${err instanceof Error ? err.message : err}`);
+    return base;
+  });
+}
+
+/**
+ * Boards currently held open by a streaming connection.
+ *
+ * Each one remembers the viewer it belongs to rather than a request, because the
+ * market a snapshot is annotated for is per person and the connection outlives
+ * any single exchange.
+ */
+interface Stream {
+  viewer: Viewer;
+  res: http.ServerResponse;
+}
+const streams = new Set<Stream>();
+
+/** How often to send a comment so proxies do not reap an idle connection. */
+const STREAM_KEEPALIVE_MS = 25_000;
+
+function sendSnapshot(stream: Stream, base: Snapshot): void {
+  void resolveView(stream.viewer, base).then((snapshot) => {
+    if (stream.res.writableEnded) return;
+    // The build id rides the stream exactly as it rides a poll, so a deploy is
+    // noticed from what is being served rather than from a connection dropping.
+    // A reconnect is evidence of a restart, not proof of one: a sleeping phone or
+    // a tunnel blip reconnects with nothing deployed.
+    const payload = JSON.stringify({ ...snapshot, build: BUILD });
+    stream.res.write(`event: snapshot\ndata: ${payload}\n\n`);
+  });
+}
+
+/** Pushes a new board to everyone watching that league. */
+function fanOut(snapshot: Snapshot): void {
+  for (const stream of streams) {
+    if (stream.viewer.league === snapshot.league) sendSnapshot(stream, snapshot);
+  }
+}
+
+/**
  * Evaluates a fresh snapshot for alerts, giving each subscriber the board as they
  * would see it so availability and favorites are resolved per person.
  */
 function onSnapshot(snapshot: Snapshot): void {
+  fanOut(snapshot);
   if (!subscriptions.available) return;
   void alerts
     .evaluate(snapshot, async (sub) =>
@@ -398,28 +475,9 @@ function handleRequest(req: http.IncomingMessage, res: http.ServerResponse): voi
   }
 
   if (url === "/api/snapshot") {
-    const league = leagueFrom(raw);
-    const chosen = zipFrom(raw);
-    const params = new URL(raw, "http://localhost").searchParams;
-    const optedOut = params.get("market") === "off";
-    const detected = optedOut ? null : detectedZip(req);
-    const zip = optedOut ? null : (chosen ?? detected);
-    const base = pollers[league].snapshot;
-    // Only the NFL splits a slate by market; college games are on cable.
-    const ready =
-      zip !== null && league === "nfl"
-        ? Promise.race([
-            withMarket(base, zip, chosen === null, chosen === null ? detectedCity(req) : null),
-            new Promise<Snapshot>((resolve) =>
-              setTimeout(() => resolve(base), MARKET_BUDGET_MS),
-            ),
-          ])
-        : Promise.resolve(base);
-    void ready
-      .catch((err) => {
-        console.error(`[http] market lookup failed: ${err instanceof Error ? err.message : err}`);
-        return base;
-      })
+    const view = viewerFor(raw, req);
+    // resolveView already falls back to the unannotated board on failure.
+    void resolveView(view, pollers[view.league].snapshot)
       .then((snapshot) => {
         snapshot = { ...snapshot, build: BUILD };
         res.writeHead(200, {
@@ -429,6 +487,38 @@ function handleRequest(req: http.IncomingMessage, res: http.ServerResponse): voi
         });
         res.end(JSON.stringify(snapshot));
       });
+    return;
+  }
+
+  if (url === "/api/stream") {
+    const viewer = viewerFor(raw, req);
+    res.writeHead(200, {
+      "content-type": "text/event-stream; charset=utf-8",
+      "cache-control": "no-store",
+      connection: "keep-alive",
+      // Tells a buffering proxy to pass events through as they are written,
+      // which is the difference between a live stream and a long silence.
+      "x-accel-buffering": "no",
+      "access-control-allow-origin": "*",
+    });
+
+    const stream: Stream = { viewer, res };
+    streams.add(stream);
+    // The current board immediately, so a fresh connection is never blank while
+    // it waits for whatever happens next.
+    sendSnapshot(stream, pollers[viewer.league].snapshot);
+
+    const keepalive = setInterval(() => {
+      if (!res.writableEnded) res.write(": keepalive\n\n");
+    }, STREAM_KEEPALIVE_MS);
+    keepalive.unref?.();
+
+    const close = () => {
+      clearInterval(keepalive);
+      streams.delete(stream);
+    };
+    req.on("close", close);
+    res.on("close", close);
     return;
   }
 

@@ -209,6 +209,7 @@ ESPN_DATES=20260905 RECENT_WINDOW_HOURS=120 npm run dev:server
 - `GET /api/snapshot?league=nfl|cfb` - the full ranked board (`live`, `upcoming`, `recent`)
 - `GET /api/snapshot?league=nfl&zip=02134` - the same board, annotated with what that market is
   carrying. Ignored for college
+- `GET /api/stream` - the same board as a live event stream, same query parameters
 - `GET /api/health` - per-league poller status, last update, failure count, next poll
 - `GET /api/notifications/config` - whether alerts are available, and the public push key
 - `POST /api/notifications/subscribe` - register a push subscription and its preferences

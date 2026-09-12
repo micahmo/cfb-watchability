@@ -33,6 +33,8 @@ export interface ScoreboardResult {
   season: number | null;
   week: number | null;
   games: RawGame[];
+  /** ESPN's untouched event documents, which the push feed patches. */
+  events: any[];
 }
 
 /** A game as ESPN describes it, before any scoring is applied. */
@@ -228,16 +230,32 @@ export async function fetchScoreboard(opts: FetchOptions): Promise<ScoreboardRes
   if (!res.ok) throw new Error(`ESPN scoreboard returned ${res.status} ${res.statusText}`);
 
   const body: any = await res.json();
-  const games = (body?.events ?? [])
-    .map((e: unknown) => normalize(e, opts.league))
-    .filter((g: RawGame | null): g is RawGame => g !== null);
-  markRegionalBroadcasts(games, opts.league);
+  const events: any[] = body?.events ?? [];
 
   return {
     season: body?.season?.year ?? null,
     week: body?.week?.number ?? null,
-    games,
+    games: normalizeEvents(events, opts.league),
+    // Kept so the push feed has something to patch. Patch paths address fields
+    // inside ESPN's own document, which normalising throws away, so the raw
+    // events are the only thing a delta can be applied to.
+    events,
   };
+}
+
+/**
+ * Turns ESPN scoreboard events into the shape the rest of the server uses.
+ *
+ * Exported because the push feed re-runs it after every patch: a delta changes
+ * one field of the raw document, and the derived view has to be rebuilt from it
+ * rather than patched in parallel.
+ */
+export function normalizeEvents(events: any[], league: League): RawGame[] {
+  const games = events
+    .map((e: unknown) => normalize(e, league))
+    .filter((g: RawGame | null): g is RawGame => g !== null);
+  markRegionalBroadcasts(games, league);
+  return games;
 }
 
 
