@@ -893,6 +893,46 @@ ahead, within one score" measures the raw margin, and UMass were 16 ahead. The q
 matters is performance against the line, `underdog margin + spread`, which is +45.5 here against
 +10 for a seven-point underdog leading by three.
 
+### The result term could not rank results
+
+`decisiveness` was `upset * 0.75`, and `upset` saturates. `MAX_VS_LINE` is seventeen, so
+anything seventeen points better than the line's pace clamps to 1.00, which on a Saturday in
+September meant:
+
+```
+ORE @ OKST   24.5-pt dogs, WON by 8    32.5 past the line   upset 1.000
+USU @ WASH   28.5-pt dogs, LOST by 2   26.5 past the line   upset 1.000
+GWEB @ LIB   28.5-pt dogs, LOST by 1   27.5 past the line   upset 1.000
+```
+
+Beating a top-ten team on the road and losing by two are the same number. A term whose job is to
+rank results cannot rank anything when every real one is already at the ceiling, so the 0.75 share
+was carrying the entire distinction, and it could not: a close final scores up to 0.952 on `core`,
+so the ceiling for "this mattered" sat below the ceiling for "this was close". Oklahoma State
+beating Oregon ranked fifth in its own recap, below a 14-16 game the favourite won.
+
+Raising `MAX_VS_LINE` was the wrong fix. It is tuned for a game in progress and is what the upset
+tag and the upset alert are calibrated against, so moving it moves both. A finished game is a
+different question with a wider range, and it gets its own scale: the underdog's final margin on
+top of the spread, over `DECISIVE_SCALE`, with a real-underdog floor at `UPSET_MIN_SPREAD` that the
+old rule lacked entirely.
+
+Swept against every finished game with a closing line. Thirty-four is where a 24.5-point underdog
+winning outright lands near the ceiling without being pinned to it, which leaves room above for the
+results that genuinely exceed it:
+
+```
+                      old   sc28   sc31   sc34   sc37   sc40
+ORE @ OKST  won by 8  0.75   1.00   1.00   0.96   0.88   0.81
+OKST @ TLSA won by 14 0.75   0.98   0.89   0.81   0.74   0.69
+IDST @ USU  won by 12 0.75   0.98   0.89   0.81   0.74   0.69
+CIT @ CLT   won by 2  0.75   0.80   0.73   0.66   0.61   0.56
+```
+
+Two games on that night's board moved at all. Oklahoma State went 68.2 to 80.1, and Michigan beating
+Oklahoma went 54.8 to 54.5, losing a term it should never have had: a 5.5-point underdog winning is
+a football game, and the new floor says so.
+
 ### A finished game is judged on whether it mattered, not whether it was tense
 
 Those are different questions, and the recap answered the second by default because a final is

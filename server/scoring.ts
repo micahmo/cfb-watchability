@@ -409,6 +409,25 @@ function underdogWon(input: ScoreInputs): boolean {
   return dog.score >= fav.score;
 }
 
+/**
+ * How big a result a finished game was, on its own scale rather than on closeness.
+ *
+ * Measured as the underdog's final margin on top of the spread, so it keeps
+ * separating after the point where `upset` has saturated, and floored at a real
+ * underdog so that a field-goal favourite winning is not a story. Unlike the
+ * closeness term this has no ceiling below 1: a recap is asking what mattered,
+ * and the biggest result of the day should be able to say so.
+ */
+function decisivenessScore(input: ScoreInputs): number {
+  if (input.isFinal !== true || input.homeSpread === null) return 0;
+  const spread = Math.abs(input.homeSpread);
+  if (spread < UPSET_MIN_SPREAD || !underdogWon(input)) return 0;
+  const homeFavoured = input.homeSpread < 0;
+  const dog = homeFavoured ? input.away : input.home;
+  const fav = homeFavoured ? input.home : input.away;
+  return clamp((spread + (dog.score - fav.score)) / DECISIVE_SCALE);
+}
+
 export function scoreGame(input: ScoreInputs): ScoreBreakdown {
   const progress = gameProgress(input.period, input.clockSeconds);
   const margin = Math.abs(input.home.score - input.away.score);
@@ -460,8 +479,7 @@ export function scoreGame(input: ScoreInputs): ScoreBreakdown {
    * one. Deliberately below what a genuine classic scores, since the best finish
    * of the day should still lead the recap.
    */
-  const decisiveness =
-    input.isFinal === true && upset >= 0.35 && underdogWon(input) ? upset * 0.75 : 0;
+  const decisiveness = decisivenessScore(input);
 
   const components: ScoreComponents = {
     tension,
@@ -572,6 +590,25 @@ const MAX_VS_LINE = 17;
  * rather than the clock.
  */
 const LATENESS_FLOOR = 0.15;
+/**
+ * How far past the closing line an underdog has to finish for the result itself
+ * to be a maximal surprise.
+ *
+ * A separate scale from `MAX_VS_LINE` on purpose. That one is tuned for a game in
+ * progress, where seventeen points ahead of the line's pace is already as
+ * surprising as the live board needs to say, and it is what the upset tag and the
+ * upset alert are calibrated against; moving it would move both. A finished game
+ * is a different question with a wider range, and at seventeen it saturates
+ * immediately: Oklahoma State beating Oregon outright as 24.5-point dogs finished
+ * 32.5 past the line, Utah State *losing by two* as 28.5-point dogs finished 26.5
+ * past it, and both scored exactly 1.000. A term meant to rank results cannot rank
+ * anything if every real upset is already at the ceiling.
+ *
+ * Thirty-four puts a 24.5-point underdog winning outright near the top without
+ * pinning it there, and leaves room above for the results that genuinely exceed
+ * it.
+ */
+const DECISIVE_SCALE = 34;
 /** Roughly the start of the fourth quarter. */
 const LATE_GAME_PROGRESS = 0.75;
 
