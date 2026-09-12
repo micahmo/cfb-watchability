@@ -30,6 +30,22 @@ const UPSET_TENSION = 0.55;
 /** Enough games in a window that choosing between them is actually a problem. */
 const KICKOFF_MIN_SLATE = 4;
 /**
+ * How good the pick of a window has to be before the window is worth mentioning.
+ *
+ * The kickoff alert only ever asked whether there were enough games to choose
+ * between, never whether any of them was worth choosing, so four FCS visitors
+ * kicking off together met the bar: Mercer at New Mexico, Northern Colorado at
+ * Wyoming, Alabama State at Troy and UC Davis at SMU, best of them rated 26.
+ *
+ * Fifty-five because that is exactly where `expectation()` stops being negative.
+ * Below it the notification's own body reads "Not expected to be much", and
+ * interrupting somebody to tell them a game is not worth watching is self-defeating.
+ *
+ * Primetime is deliberately exempt. Its premise is the opposite, that the only
+ * game in its slot might not be good and is worth saying so about.
+ */
+const KICKOFF_MIN_SCORE = 55;
+/**
  * A window with one game in it is the whole slate, which is its own reason to
  * say something: not "this is the best of several" but "football is on".
  *
@@ -51,7 +67,26 @@ const PRIMETIME_MAX_SLATE = 1;
  */
 const KICKOFF_GRACE_MS = 2 * 60 * 60 * 1000;
 
+/**
+ * How many alerts a league may send in a day before it has to earn more.
+ *
+ * Not a hard stop. A fixed cap spent by mid-afternoon means the best game of the
+ * evening arrives in silence, which is the exact failure the whole feature exists
+ * to prevent: a notification's job is to say you are watching the wrong game, and
+ * "we already sent three" is not a reason that game stopped being worth switching
+ * to.
+ */
 const DAILY_CAP = 3;
+/**
+ * Past the soft cap, an alert has to beat the best already sent today by this much.
+ *
+ * Clearly better, not marginally: without a margin a slate drifting upward would
+ * trickle out an alert per point. Five is about the gap between "another good one"
+ * and "better than anything you have been told about".
+ */
+const BETTER_BY = 5;
+/** Even a day of escalating classics stops here. */
+const HARD_CAP = 6;
 const COOLDOWN_MS = 10 * 60 * 1000;
 const FAVORITE_BONUS = [0, 8, 13];
 
@@ -61,9 +96,29 @@ export interface Alert {
   score: number;
   /** Other games live right now, which decides the wording but never the sending. */
   alternatives: number;
+  /**
+   * The kickoff window this came from, marked as announced only once it is sent.
+   *
+   * Carried rather than marked while deciding, because the cap is now judged on
+   * the best candidate's score and so has to be checked *after* candidates exist.
+   * Marking during selection would let a window be consumed by an alert the cap
+   * then refused, and it would never be mentioned again.
+   */
+  slotKey?: string;
 }
 
 function secondsLeft(game: Game): number {
+  /*
+   * Overtime has all the time in the world.
+   *
+   * College overtime is untimed, so the clock reads zero, and computing from it
+   * gives "no time left" on precisely the games most worth interrupting somebody
+   * for. Purdue and Wake Forest went to double overtime, finished 38-36, rated
+   * 77.9 and sent nothing, because the gate meant to drop alerts arriving twenty
+   * seconds too late decided a second overtime was too late to switch to. A single
+   * overtime possession takes minutes of real time.
+   */
+  if (game.period > 4) return Number.POSITIVE_INFINITY;
   return (4 - Math.min(game.period, 4)) * 900 + game.clockSeconds;
 }
 
@@ -106,21 +161,43 @@ export class AlertEngine {
   private dailyCount = new Map<string, number>();
   /** Kickoff windows already announced, keyed by league and slot. */
   private announced = new Set<string>();
+  /** The best score sent today, per subscription and league, for the soft cap. */
+  private bestSent = new Map<string, number>();
   /** Pregame anticipation by game id, which the game itself drops once it starts. */
   private anticipation = new Map<string, number>();
 
   constructor(private readonly store: SubscriptionStore) {}
 
-  private allowed(sub: Subscription, league: League, now: number): boolean {
-    if (now - (this.lastSentAt.get(sub.id) ?? 0) < COOLDOWN_MS) return false;
-    return (this.dailyCount.get(`${sub.id}:${league}:${dayKey(now)}`) ?? 0) < DAILY_CAP;
+  /**
+   * Whether anything may be sent at all, before deciding what.
+   *
+   * The cooldown is absolute; the daily cap is not. Beyond it a game still gets
+   * through by being clearly better than the best already sent, so an evening
+   * classic is not silenced by three ordinary afternoon alerts.
+   */
+  private allowed(sub: Subscription, league: League, now: number, score: number): boolean {
+    const key = `${sub.id}:${league}:${dayKey(now)}`;
+    const count = this.dailyCount.get(key) ?? 0;
+    if (count >= HARD_CAP) return false;
+    if (count < DAILY_CAP) return true;
+    return score >= (this.bestSent.get(key) ?? 0) + BETTER_BY;
   }
 
-  private record(sub: Subscription, league: League, now: number, keys: string[]): void {
-    for (const key of keys) this.sent.add(key);
+  private record(
+    sub: Subscription,
+    league: League,
+    now: number,
+    alerts: Alert[],
+    score: number,
+  ): void {
+    for (const alert of alerts) {
+      this.sent.add(`${sub.id}:${alert.game.id}:${alert.category}`);
+      if (alert.slotKey !== undefined) this.announced.add(alert.slotKey);
+    }
     this.lastSentAt.set(sub.id, now);
     const key = `${sub.id}:${league}:${dayKey(now)}`;
     this.dailyCount.set(key, (this.dailyCount.get(key) ?? 0) + 1);
+    this.bestSent.set(key, Math.max(this.bestSent.get(key) ?? 0, score));
   }
 
   private liveCandidates(sub: Subscription, snapshot: Snapshot): Alert[] {
@@ -240,13 +317,16 @@ export class AlertEngine {
        */
       if (best.state !== "in" || best.period < 1) continue;
 
-      this.announced.add(key);
+      // "The pick of a busy window" has to actually be a pick worth making.
+      if (category === "kickoff" && rank(best) < KICKOFF_MIN_SCORE) continue;
+
       out.push({
         category,
         game: best,
         // Clamped here, where it is read by a person, exactly as the board clamps it.
         score: Math.min(100, rank(best)),
         alternatives: games.length - 1,
+        slotKey: key,
       });
     }
     return out;
@@ -303,7 +383,8 @@ export class AlertEngine {
 
     let sent = 0;
     for (const sub of this.store.all) {
-      if (!this.allowed(sub, snapshot.league, now)) continue;
+      // Cooldown first, since it needs nothing and costs nothing.
+      if (now - (this.lastSentAt.get(sub.id) ?? 0) < COOLDOWN_MS) continue;
 
       let view: Snapshot;
       try {
@@ -320,13 +401,11 @@ export class AlertEngine {
 
       // One buzz, not three. A chaotic finish should not machine-gun a phone.
       candidates.sort((a, b) => b.score - a.score);
+      // Judged on the best of them, and only now that there is a score to judge.
+      if (!this.allowed(sub, snapshot.league, now, candidates[0].score)) continue;
+
       await this.store.send(sub, buildPayload(candidates));
-      this.record(
-        sub,
-        snapshot.league,
-        now,
-        candidates.map((c) => `${sub.id}:${c.game.id}:${c.category}`),
-      );
+      this.record(sub, snapshot.league, now, candidates, candidates[0].score);
       sent += 1;
     }
     return sent;

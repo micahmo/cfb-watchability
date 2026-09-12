@@ -740,6 +740,36 @@ notification per game per tier, ever; a global cooldown with simultaneous crossi
 a single message; a daily cap of three per league; and never notify about a game the market
 lookup says is unavailable.
 
+### Three rules that suppressed the games they existed to deliver
+
+All found on one live Saturday, all the same shape: a guard written for a common case
+silently killing the uncommon one it was supposed to protect.
+
+**Overtime had no time left.** `secondsLeft` computes from the game clock, and college overtime is
+untimed, so the clock reads zero: `(4 - min(period, 4)) * 900 + 0`. The `hero` alert requires sixty
+seconds remaining, meant to drop alerts arriving twenty seconds too late to act on, so a double
+overtime scored zero and was refused. Purdue and Wake Forest finished 38-36 in the second overtime,
+rated 77.9, and sent nothing. An overtime possession takes minutes of real time; overtime now returns
+infinity.
+
+**The daily cap was a hard stop.** Three alerts and the league went quiet for the day, so an
+afternoon of ordinary games could silence the best game of the evening, which is exactly the failure
+the feature exists to prevent. It is now a soft cap: past three, an alert still goes if it beats the
+best already sent by five, with a hard stop at six. Five because without a margin a slate drifting
+upward trickles out an alert per point.
+
+Making that work meant making kickoff-window selection pure. It used to mark a window announced
+while choosing, and the cap is now judged on the chosen candidate's score, so a window could be
+consumed by an alert the cap then refused and never be mentioned again.
+
+**Kickoff never asked whether the games were any good.** It checked only that a window had four or
+more, so four FCS visitors kicking off together qualified: Mercer at New Mexico, Northern Colorado at
+Wyoming, Alabama State at Troy, UC Davis at SMU, best of them rated 26. The notification's own body
+read "Not expected to be much", and the board ranked that game below the fold, so the alert was
+pointing at something the board had already decided was not worth showing. The floor is 55, which is
+exactly where `expectation()` stops being negative. Primetime stays exempt: its whole premise is that
+the only game in its slot might not be good.
+
 ### How the thresholds were chosen
 
 By replaying real games rather than by argument. ESPN's summary endpoint returns a

@@ -597,7 +597,10 @@ export function buildTags(game: Game, breakdown: ScoreBreakdown): string[] {
   // claimed a specific story the condition does not actually require.
   const onTheLine = !isFinal && breakdown.clutch >= 0.6;
 
-  if (game.period > 4) tags.push("OVERTIME");
+  /* How many overtimes, not merely that there were some. A double overtime is a
+     different event from a single one, and the recap is read afterwards, when
+     "2OT" is most of what anybody wants to know about the game. */
+  if (game.period > 4) tags.push(game.period === 5 ? "OVERTIME" : `${game.period - 4}OT`);
   if (breakdown.total >= 80) tags.push("INSTANT CLASSIC");
   if (onTheLine) tags.push("GAME ON THE LINE");
 

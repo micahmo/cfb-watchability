@@ -94,6 +94,8 @@
     "UPSET ALERT",
     "BIG UPSET",
   ]);
+  /** `2OT`, `3OT` and so on are the same event as `OVERTIME` and read the same. */
+  const hot = (tag: string) => HOT_TAGS.has(tag) || /^\d+OT$/.test(tag);
 </script>
 
 <!-- The card stays an <article> and takes the button role rather than becoming one:
@@ -232,7 +234,7 @@
            an exception with no rule behind it. -->
       {#if game.conferenceGame}<span class="note">conference game</span>{/if}
       {#each game.tags as tag (tag)}
-        <span class="tag" class:hot={HOT_TAGS.has(tag)}>{tag}</span>
+        <span class="tag" class:hot={hot(tag)}>{tag}</span>
       {/each}
     </div>
 
