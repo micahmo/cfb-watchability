@@ -79,7 +79,20 @@ they are. Measured on a live slate:
 | 24.5-point dog tied at half | 0.40 alert | 0.40 alert |
 
 The 24.5-point one rising slightly while the 6.5-point one falls is the whole point: the surprise is
-doing the work rather than the clock. **Fitted to five live games, though**, which is a handful and
+doing the work rather than the clock.
+
+That reweighting only delayed the problem rather than fixing it. The 6.5-point game crossed the bar
+again a few minutes later, because `vsLine` measures *points ahead of the line's pace*, and by that
+measure a 6.5-point underdog leading by ten is twelve points ahead of expectation while a
+twenty-point underdog **tied** is only eight. The coin flip reads as the bigger surprise, which is
+backwards for a label meaning "something unlikely is happening".
+
+So the tag needs a real underdog, at ten points or more, whatever the score is doing. A 6.5-point
+dog leading is not unlikely, it happens every week, and you can only upset somebody who was actually
+favoured. The notification path has always had this floor, at six, in `upsetTensionScore`; the tag
+had none, which is why the board and the alerts disagreed about what counted. Reasoned rather than
+measured, unlike the shootout thresholds: closing lines vanish from the scoreboard at kickoff, so
+checking it against a season of finals would need a summary fetch per game. **Fitted to five live games, though**, which is a handful and
 not a calibration set. The direction is principled and the constants are not yet earned; they want
 checking against a season of in-game states the way the shootout thresholds were.
 

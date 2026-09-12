@@ -495,6 +495,26 @@ export function scoreGame(input: ScoreInputs): ScoreBreakdown {
  */
 const ONE_SCORE = 8;
 /**
+ * How big an underdog a team has to have been for beating the line to be an upset.
+ *
+ * `upset` measures points ahead of the line's pace, which ranks games well and
+ * makes a poor label on its own: a 6.5-point underdog leading by ten is twelve
+ * points ahead of expectation, while a twenty-point underdog *tied* is only eight,
+ * so the coin flip reads as the bigger surprise. It is not one. A 6.5-point dog
+ * leading happens every week, and you can only upset somebody who was actually
+ * favoured.
+ *
+ * So the label needs a real underdog, whatever the score is doing. The
+ * notification path has always had this floor, at six, in `upsetTensionScore`; the
+ * tag had none, which is why the board and the alerts disagreed about what counted.
+ * Ten rather than six because six still admits near coin flips.
+ *
+ * Reasoned rather than measured, unlike the shootout thresholds: closing lines are
+ * absent from the scoreboard once a game kicks off, so checking this against a
+ * season of finals would mean a summary fetch per game.
+ */
+const UPSET_MIN_SPREAD = 10;
+/**
  * Where a game's scoring has to be heading to count as a shootout, per league.
  *
  * Compared against the *projected* total rather than points already scored, which
@@ -584,9 +604,13 @@ export function buildTags(game: Game, breakdown: ScoreBreakdown): string[] {
     tags.push("ONE SCORE, LATE");
   }
   const underdog = underdogView(game);
+  /* A game with no line falls back to the rank gap, which carries its own notion
+     of a mismatch, so the floor only applies where a line exists to measure. */
+  const realUnderdog =
+    game.pregameSpread === null || Math.abs(game.pregameSpread) >= UPSET_MIN_SPREAD;
   // Magnitude is carried by `breakdown.upset` itself, which already blends the
   // closing line with the rank gap, so no separate gap gate is needed here.
-  if (underdog !== null) {
+  if (underdog !== null && realUnderdog) {
     if (isFinal && underdog.levelOrAhead && breakdown.upset >= 0.35) {
       // Past tense for a finished game: "ALERT" tells you to go and watch
       // something that is already over. Sized so a glance at the recap separates
