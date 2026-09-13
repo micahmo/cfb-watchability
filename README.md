@@ -63,13 +63,15 @@ Every live game gets a 0-100 score and the board sorts on it.
 quarter is not the event a tie with ninety seconds left is. Closeness comes from ESPN's live win
 probability, falling back to a margin curve when ESPN stops publishing one.
 
-**Three other terms can take over when closeness misses the point.** A team down five with the
+**Four other terms can take over when closeness misses the point.** A team down five with the
 ball and thirty seconds left has a terrible win probability and is the most watchable thing on
 television, so one-score games inside the final five minutes get a `clutch` score. An underdog
 running away from where the closing line put it gets an `upsetTension` score, so a blowout upset
-is not invisible to a board that otherwise only rewards close games. And a finished game that a
-real underdog won gets a `decisiveness` score, since a recap is asking what mattered rather than
-what was tense. The dominant term is whichever of the four is highest.
+is not invisible to a board that otherwise only rewards close games. A finished game that a real
+underdog won gets a `decisiveness` score, since a recap is asking what mattered rather than what
+was tense. And a game that has only just kicked off keeps a fading share of what it was billed
+as, because a 0-0 first quarter is the one moment when the billing is the only evidence there is.
+The dominant term is whichever of the five is highest.
 
 Five smaller components adjust it, with fixed weights:
 

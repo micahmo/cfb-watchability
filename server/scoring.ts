@@ -418,6 +418,56 @@ function underdogWon(input: ScoreInputs): boolean {
  * closeness term this has no ceiling below 1: a recap is asking what mattered,
  * and the biggest result of the day should be able to say so.
  */
+/**
+ * What the game was billed as, fading as it starts producing evidence of its own.
+ *
+ * Computed rather than remembered. `anticipationScore` needs only fields
+ * `ScoreInputs` already carries, so there is no cache to go stale and nothing to
+ * lose across a restart, which is how the same idea in the alert path gets caught
+ * out.
+ */
+function billingCarry(input: ScoreInputs, progress: number): number {
+  if (input.isFinal === true || progress >= BILLING_UNTIL) return 0;
+  /*
+   * The scoreboard gets a veto.
+   *
+   * Billing is a prediction, and a prediction the game has already contradicted
+   * is worth nothing: a 100-rated matchup that is 28-0 in the second quarter was
+   * simply wrong, and the board should not keep insisting on it until halftime
+   * out of respect for last Tuesday.
+   *
+   * Reusing the live closeness curve rather than inventing a second one, and
+   * squared, because a billing that has been contradicted should die quickly
+   * rather than deflate. For a 100-rated game in the first quarter: 7-0 still
+   * carries 0.47, which is right because 7-0 early is a football game, 14-0 falls
+   * to 0.22, and 21-0 to 0.06, which is gone.
+   *
+   * Margin rather than win probability, deliberately. Win probability carries the
+   * pregame prior, so at 0-0 it already reads 0.40 for an 80% favourite and would
+   * gut a marquee game's billing before a snap had been played. The scoreboard is
+   * the only evidence here that is actually about this game.
+   */
+  const contradiction = Math.pow(
+    tensionFromMargin(
+      Math.abs(input.home.score - input.away.score),
+      secondsRemaining(input.period, input.clockSeconds),
+    ),
+    2,
+  );
+  const expected = anticipationScore({
+    league: input.league,
+    spread: input.homeSpread,
+    overUnder: input.overUnder,
+    home: input.home,
+    away: input.away,
+    network: input.network,
+    conferenceGame: input.conferenceGame,
+    divisionGame: input.divisionGame,
+    startDate: input.startDate,
+  });
+  return clamp((expected / 100) * BILLING_CARRY * (1 - progress / BILLING_UNTIL) * contradiction);
+}
+
 function decisivenessScore(input: ScoreInputs): number {
   if (input.isFinal !== true || input.homeSpread === null) return 0;
   const spread = Math.abs(input.homeSpread);
@@ -480,6 +530,7 @@ export function scoreGame(input: ScoreInputs): ScoreBreakdown {
    * of the day should still lead the recap.
    */
   const decisiveness = decisivenessScore(input);
+  const billing = billingCarry(input, progress);
 
   const components: ScoreComponents = {
     tension,
@@ -487,10 +538,12 @@ export function scoreGame(input: ScoreInputs): ScoreBreakdown {
     core,
     clutch,
     upsetTension,
-    // Three ways to earn the dominant term, and a game qualifies on any of them:
-    // it is close and late, it has a decisive snap coming, or something is
-    // happening that was not supposed to.
-    primary: Math.max(core, clutch, upsetTension, decisiveness),
+    // Several ways to earn the dominant term, and a game qualifies on any of
+    // them: it is close and late, it has a decisive snap coming, something is
+    // happening that was not supposed to, a real underdog finished the job, or it
+    // has only just kicked off and was billed as the one to watch.
+    billing,
+    primary: Math.max(core, clutch, upsetTension, decisiveness, billing),
     prominence: prominenceScore({
       league: input.league,
       homeConferenceId: input.home.conferenceId,
@@ -609,6 +662,28 @@ const LATENESS_FLOOR = 0.15;
  * it.
  */
 const DECISIVE_SCALE = 34;
+/**
+ * What a game's pregame billing is still worth once it has kicked off.
+ *
+ * The board knew Ohio State at Texas was the game of the week all week, rated it
+ * 100, and then threw that away the moment it kicked off: a 0-0 first quarter has
+ * no closeness and no lateness, so `core` is near zero and only `prominence` is
+ * left holding it up, at 0.18 of the weighting. It sat at 32.8 while nothing had
+ * happened yet, which is exactly when the billing is the only evidence there is.
+ *
+ * Below one on purpose. A game still has to earn the top of the board, so the
+ * best possible billing loses to a genuine late thriller scoring 0.95 on
+ * closeness. It only has to beat the filler.
+ */
+const BILLING_CARRY = 0.8;
+/**
+ * When the billing has fully given way to what the game is actually doing.
+ *
+ * Halftime. By then there is real evidence either way and an expectation formed
+ * last Tuesday should not be competing with it. The decay is linear rather than
+ * cliffed so a game does not drop off the board between two refreshes.
+ */
+const BILLING_UNTIL = 0.5;
 /** Roughly the start of the fourth quarter. */
 const LATE_GAME_PROGRESS = 0.75;
 

@@ -33,7 +33,9 @@ export interface ScoreComponents {
   clutch: number;
   /** 0..1 for an upset in progress, peaking while the result is still in doubt. */
   upsetTension: number;
-  /** `max(core, clutch)`. The dominant term in every weight profile. */
+  /** What the game was billed as, fading out by halftime. */
+  billing: number;
+  /** The largest of the ways a game can earn the dominant term. */
   primary: number;
   /** How much of the country cares, independent of whether it is close. */
   prominence: number;

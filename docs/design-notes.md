@@ -893,6 +893,41 @@ ahead, within one score" measures the raw margin, and UMass were 16 ahead. The q
 matters is performance against the line, `underdog margin + spread`, which is +45.5 here against
 +10 for a seven-point underdog leading by three.
 
+### The board forgot what it had been saying all week
+
+Ohio State at Texas was the game of the week, rated 100 on the planning list for days, and the
+moment it kicked off it scored **32.8** and sat mid-board with nothing having happened. That is
+structural: `core` is closeness times lateness and a 0-0 first quarter has neither, so the only
+term left holding a marquee game up is `prominence`, at 0.18 of the weighting. The board threw
+away its own best information at exactly the moment that information was all there was.
+
+So the billing carries into the live score and fades out by halftime. It is computed rather than
+remembered: `anticipationScore` needs only fields `ScoreInputs` already carries, so there is no
+cache to go stale and nothing to lose across a restart, which is how the same idea in the alert
+path gets caught out.
+
+**The scoreboard gets a veto**, and it needs to be a fast one. A prediction the game has already
+contradicted is worth nothing, and a 100-rated matchup sitting at 28-0 was simply wrong. The veto
+reuses the live closeness curve rather than inventing a second one, squared so a contradicted
+billing dies rather than deflates. For that game:
+
+```
+kickoff 0-0     billing 0.70   TOTAL 65.2
+Q1 7:30 0-0     billing 0.53   TOTAL 54.9
+Q1 7:30 7-0     billing 0.41   TOTAL 48.1     still a football game
+Q1 7:30 21-0    billing 0.06   TOTAL 28.5     the billing was wrong
+halftime        billing 0.00   TOTAL 46.2     judged on its own evidence
+```
+
+Margin rather than win probability, deliberately. Win probability carries the pregame prior, so at
+0-0 it already reads 0.40 for an 80% favourite and would gut a marquee game's billing before a snap
+had been played. The scoreboard is the only evidence here that is actually about this game.
+
+The share is capped below one so a game still has to earn the top of the board: the best possible
+billing loses to a genuine late thriller scoring 0.95 on closeness. It only has to beat the filler.
+Checked against a live slate: two games moved, both of them freshly kicked off, and every blowout
+on the board sat at exactly 0.00.
+
 ### The result term could not rank results
 
 `decisiveness` was `upset * 0.75`, and `upset` saturates. `MAX_VS_LINE` is seventeen, so
