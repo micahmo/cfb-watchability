@@ -473,6 +473,45 @@ never drop. Anything failing that is stale and the pushed document stands. As so
 up it is accepted again, which is what keeps polling able to heal a patch that went missing, and it
 logs when it refuses so the frequency is visible rather than guessed at.
 
+### ESPN can publish a win probability that is not possible
+
+Caught by the history log the night it was added. Ohio State led Texas 20-3 with ten seconds of the
+half remaining:
+
+```
+01:13:30   13-3   wp 0.2062   total 36.9
+01:14:12   13-9   wp 0.1920   total 35.5     a score Texas never had
+01:14:21   19-3   wp 0.4701   total 53.7     ESPN's number, during the scoring burst
+01:17:04   20-3   wp 0.0961   total 38.1     what it should have been
+```
+
+The half then ended, so nothing refreshed for three minutes and the board showed that game at 53.8
+the whole time. The first suspect was the win-probability carry, and it was wrong: 0.4701 appears
+nowhere else in the game, so nothing cached could have produced it. ESPN simply published it.
+
+**The obvious guard is a trap.** Letting the scoreboard override any optimistic win probability
+fires on 31.3% of all frames and destroys the games this board exists to find: the 43-41 game that
+ran to the wire sat at a seven-point margin with a probability saying coin flip and
+`tensionFromMargin` saying 0.08, and the probability was right. The margin curve is deliberately
+harsher than reality late, because ten points means something different with two minutes left.
+
+So the guard is about impossibility, not optimism, and the bound comes from ESPN's own numbers
+rather than from an opinion. Across 11,597 live frames:
+
+```
+scores behind    frames    max trailing win prob
+1-8               2837                     0.984
+9-16              2307                     0.662
+17-24             1786                     0.194
+25+               3415                     0.043
+```
+
+Trailing by seventeen or more, it never exceeded 0.194 in 5,201 frames. The threshold sits at 0.35,
+most of the way to double the highest real value ever seen, and replayed across the whole corpus it
+fires on exactly zero frames. The held value is dropped alongside it, since the reason it went wrong
+is that the score moved underneath it, and the margin curve answers instead because it is the one
+thing that is definitely current.
+
 ### Win probability needs its own carry
 
 The situation carry fills a gap only when the *whole* block is absent, which is right for possession

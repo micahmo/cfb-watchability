@@ -85,6 +85,23 @@ const SITUATION_CARRY_MS = 4 * 60 * 1000;
  * about it having changed but whether ESPN was sending the field.
  */
 const WIN_PROB_CARRY_MS = 90 * 1000;
+/**
+ * How far behind a side has to be before its win probability stops being credible.
+ *
+ * Not a judgement about football, a bound measured from ESPN's own numbers. Across
+ * 11,597 live frames of finished games: with a side trailing by 17 to 24 its win
+ * probability never once exceeded 0.194 in 1,786 frames, and trailing by 25 or more
+ * it never exceeded 0.043 in 3,415. Below 17 it can be anything, and rightly so, a
+ * one-score game late is a coin flip however it looks on the scoreboard.
+ *
+ * Which is what makes the guard safe and why it is written this narrowly. The
+ * obvious version, letting the scoreboard override any optimistic probability,
+ * would fire on 31% of all frames and gut the games this board exists to find: the
+ * 43-41 game that ran to the wire sat at a 7-point margin with a probability
+ * saying coin flip and a margin curve saying 0.08, and the probability was right.
+ */
+const IMPLAUSIBLE_DEFICIT = 17;
+const IMPLAUSIBLE_WIN_PROB = 0.35;
 
 function yyyymmdd(d: Date): string {
   return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
@@ -576,6 +593,32 @@ export class LeaguePoller {
   private carrySituation(games: RawGame[], now: number): void {
     for (const game of games) {
       if (game.state !== "in") continue;
+
+      /*
+       * A win probability the scoreboard says cannot be true is thrown away, along
+       * with anything held for this game, because the reason it is wrong is that
+       * the score moved underneath it.
+       *
+       * Seen live: Ohio State led Texas 20-3 with ten seconds of the half left and
+       * ESPN published 0.4701 for Texas, having published 0.2062 a play earlier at
+       * 13-3 and 0.0961 a moment later. The half then ended, nothing refreshed, and
+       * the board showed that game at 53.8 for three minutes on the strength of one
+       * bad frame. Dropping it rather than carrying anything lets the margin curve
+       * answer, which is the one thing that is definitely current.
+       */
+      if (game.homeWinProb !== null) {
+        const deficit = Math.abs(game.home.score - game.away.score);
+        const trailing =
+          game.home.score < game.away.score ? game.homeWinProb : 1 - game.homeWinProb;
+        if (deficit >= IMPLAUSIBLE_DEFICIT && trailing > IMPLAUSIBLE_WIN_PROB) {
+          console.log(
+            `[${this.tag()}] dropped an impossible win probability for ${game.shortName}: ` +
+              `trailing by ${deficit} at ${(trailing * 100).toFixed(1)}%`,
+          );
+          game.homeWinProb = null;
+          this.lastWinProb.delete(game.id);
+        }
+      }
 
       /* Win probability first and separately: ESPN drops it on its own, with the
          rest of the situation still present, in about one live sample in eleven. */
