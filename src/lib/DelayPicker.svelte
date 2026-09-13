@@ -25,7 +25,7 @@
   }
 </script>
 
-<button type="button" class="dd-toggle" class:delayed={prefs.delaySeconds > 0} onclick={() => ontoggle?.()}>
+<button type="button" class="dd-toggle" onclick={() => ontoggle?.()}>
   {label}
   <span class="dd-caret" class:open>▾</span>
 </button>
@@ -85,12 +85,6 @@
 {/if}
 
 <style>
-  .dd-toggle.delayed {
-    /* Says "deliberately behind" at a glance, so a frozen-looking board is never
-       mistaken for a broken one. */
-    border-color: var(--accent);
-    color: var(--accent);
-  }
   .row {
     display: flex;
     align-items: center;
