@@ -154,7 +154,7 @@ function normalize(event: any, league: League): RawGame | null {
     nationalBroadcast,
     possessionTeamId: comp?.situation?.possession != null ? String(comp.situation.possession) : null,
     downDistance: comp?.situation?.downDistanceText ?? null,
-    isRedZone: Boolean(comp?.situation?.isRedZone),
+    isRedZone: redZone(comp, home.id),
     // ESPN uses -1 for "no play in progress", which is a value, not a position.
     yardLine: fieldNumber(comp?.situation?.yardLine, 0, 100),
     down: fieldNumber(comp?.situation?.down, 1, 4),
@@ -260,6 +260,28 @@ export async function fetchScoreboard(opts: FetchOptions): Promise<ScoreboardRes
  * one field of the raw document, and the derived view has to be rebuilt from it
  * rather than patched in parallel.
  */
+/**
+ * Whether the team with the ball is inside the opponent's twenty.
+ *
+ * Derived from the ball rather than read from `situation.isRedZone`, which ESPN
+ * does not keep in step with it. Sampled across one live slate, the flag
+ * disagreed with the ball on two of twenty games at the same instant, and in both
+ * directions: Ohio State had it set while sitting on their own 19, left over from
+ * the previous possession, and Iowa had it clear with the ball on their 8. The
+ * board draws the ball, so a shaded end zone that contradicts it is visibly wrong
+ * in a way a missing one is not.
+ *
+ * Falls back to the flag when there is no ball position to reason from, which is
+ * every moment between plays.
+ */
+function redZone(comp: any, homeId: string): boolean {
+  const yardLine = fieldNumber(comp?.situation?.yardLine, 0, 100);
+  const possession = comp?.situation?.possession;
+  if (yardLine === null || possession == null) return Boolean(comp?.situation?.isRedZone);
+  // `yardLine` counts from the home goal line, so home attacks 100 and away zero.
+  return String(possession) === homeId ? yardLine >= 80 : yardLine <= 20;
+}
+
 export function normalizeEvents(events: any[], league: League): RawGame[] {
   const games = events
     .map((e: unknown) => normalize(e, league))
