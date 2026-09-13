@@ -1223,6 +1223,32 @@ sent, so the background sync does not repeat it, and a burst of changes is debou
 four conferences is one update. And a re-registration carrying no market must not erase a known
 one, since the zip is null until a snapshot resolves one, which on the college tab may be never.
 
+## The settings row stopped fitting
+
+Four controls, and on a phone picking a second conference pushed the last one onto a new line. Every
+setting added makes that worse, and the labels grew without bound on their own: `Favorites` joined
+the whole selection while `Alerts` had always used a count, so two conferences was enough to wrap.
+
+Collapsing them behind a button costs the thing the row was quietly good at, which was saying what
+the board is set to without opening anything. So the button carries a summary line instead:
+
+```
+Settings ▾   AFC, NFC · 01420 · 5 alerts
+```
+
+One line, `text-overflow: ellipsis`, never wrapping however much is added later. On a phone the
+header went from 121px to 79px with the row closed.
+
+A "something is non-default" dot was the first idea and is useless in practice, because on a board
+somebody actually uses everything is non-default. Saying *what* is set costs barely more room.
+
+Three details worth keeping. The favourites are listed up to three and counted after, since naming
+six conferences pushes the market and the alert count off the end and lets the least important
+setting crowd out the rest. The delay is deliberately absent from the summary, because the status
+indicator already reads "35s behind" a few pixels away. And the row is hidden rather than removed
+from the DOM, so the pickers keep their own state, a half-typed postal code included, which also
+means `display: flex` has to be overridden explicitly or the `hidden` attribute does nothing at all.
+
 ## Telling an open board that it is out of date
 
 The service worker cannot do it. `sw.js` is copied into the build untouched and names no hashed

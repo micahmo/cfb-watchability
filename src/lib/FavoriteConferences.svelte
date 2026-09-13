@@ -19,7 +19,7 @@
 
 {#if conferences.length}
   <button type="button" class="dd-toggle" onclick={() => ontoggle?.()}>
-    {chosen.length ? `Favorites: ${chosen.join(", ")}` : "Favorites"}
+    {chosen.length ? `Favorites (${chosen.length})` : "Favorites"}
     <span class="dd-caret" class:open>▾</span>
   </button>
 {/if}

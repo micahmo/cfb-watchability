@@ -87,6 +87,53 @@
   }
 
   /*
+   * The settings collapse, and a summary line stands in for them.
+   *
+   * Four controls already wrap on a phone once a couple of conferences are
+   * picked, and every new setting makes that worse. Hiding them behind a button
+   * would cost the thing the row was actually good at, which is saying what the
+   * board is currently set to without opening anything, so the summary keeps that
+   * in a fraction of the width: one small line that truncates rather than wraps,
+   * however much is added to it later.
+   *
+   * A "something is non-default" marker was the first idea and is useless here,
+   * because everything is non-default. Saying *what* is set costs barely more
+   * room and is worth incomparably more.
+   */
+  let settingsOpen = $state(false);
+
+  function toggleSettings(): void {
+    settingsOpen = !settingsOpen;
+    // A panel left open underneath would otherwise reappear on the next expand.
+    if (!settingsOpen) openPanel = null;
+  }
+
+  const settingsSummary = $derived.by(() => {
+    const parts: string[] = [];
+    const favorites = prefs.favorites[prefs.league] ?? [];
+    /* Listed while the list is short enough to be worth reading, counted after.
+       Naming six conferences pushes the market and the alert count off the end,
+       which lets the least important setting crowd out the rest. */
+    if (favorites.length > 3) parts.push(`${favorites.length} conferences`);
+    else if (favorites.length > 0) parts.push(favorites.join(", "));
+    if (prefs.league === "nfl") {
+      /* The viewer's own setting first: the resolved market is null until a
+         snapshot carries one, which on a quiet morning may be never, and the
+         summary would then omit a postal code the chip beside it is displaying. */
+      if (prefs.marketOff) parts.push("no market");
+      else if (prefs.zip) parts.push(prefs.zip);
+      else if (snapshot?.market?.city) parts.push(snapshot.market.city);
+      else if (snapshot?.market?.zip) parts.push(`${snapshot.market.zip} (detected)`);
+    }
+    const alerts = prefs.alerts[prefs.league] ?? [];
+    if (alerts.length > 0) parts.push(`${alerts.length} alert${alerts.length === 1 ? "" : "s"}`);
+    /* The delay is deliberately absent: the status indicator already says "35s
+       behind" a few pixels away, and the same fact twice in adjacent rows is
+       noise rather than reassurance. */
+    return parts.join(" · ");
+  });
+
+  /*
    * Both leagues run at once, and each keeps two snapshots.
    *
    * `latest` is the truth as received, `boards` is what a viewer would see, which
@@ -410,7 +457,21 @@
       <span class="mono updated">{updatedLabel}</span>
     </div>
   </div>
-  <div class="controls-row">
+  <div class="settings-bar">
+    <button
+      type="button"
+      class="dd-toggle"
+      aria-expanded={settingsOpen}
+      onclick={toggleSettings}
+    >
+      Settings
+      <span class="dd-caret" class:open={settingsOpen}>▾</span>
+    </button>
+    {#if !settingsOpen && settingsSummary}
+      <span class="settings-summary">{settingsSummary}</span>
+    {/if}
+  </div>
+  <div class="controls-row" hidden={!settingsOpen}>
     <FavoriteConferences
       {conferences}
       league={prefs.league}
@@ -639,12 +700,36 @@
     stroke-linejoin: round;
     opacity: 0.7;
   }
+  .settings-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 14px;
+    /* The row must never be the thing that makes the header taller, so the
+       summary is given a single line and told to give up rather than wrap. */
+    min-width: 0;
+  }
+  .settings-summary {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-size: 12px;
+    color: var(--text-faint);
+  }
+  /* `display: flex` beats the `hidden` attribute on its own, so the row stays on
+     screen unless this says otherwise. Hidden rather than removed from the DOM so
+     the pickers keep their own state, a half-typed postal code included. */
+  .controls-row[hidden] {
+    display: none;
+  }
   .controls-row {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: 8px;
-    margin-top: 14px;
+    margin-top: 10px;
   }
   /* An open panel takes a whole row of its own and is ordered after both buttons,
      so it pushes the board down rather than covering it, and never wedges itself
