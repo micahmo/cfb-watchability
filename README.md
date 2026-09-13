@@ -111,6 +111,21 @@ Read each tab against itself; the two leagues produce different distributions. P
 `anticipation` and the live score are different scales too. On the live board, `TURN THIS ON`
 fires at 75.
 
+## Keeping up with your television
+
+The push feed puts a play on the board about two seconds after it happens, and a broadcast runs
+anywhere from ten seconds to a minute behind that, so by default the board spoils the game it is
+meant to help you watch.
+
+The delay control in the header holds the board behind live by a number of seconds you choose. Set
+it by nudging rather than by guessing your feed's latency: adjust it while watching until the score
+changes on screen at the same moment you see it change. Presets are rough starting points, cable
+near fifteen seconds and a streaming app near thirty-five.
+
+The setting is per browser, so two people watching different feeds each get their own. Notifications
+are held by the same amount, since a push that beats the television spoils exactly what the board is
+withholding.
+
 ## Can I actually watch it
 
 A great game you cannot get is not a recommendation. On Sunday afternoons the networks split the

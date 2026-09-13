@@ -404,9 +404,27 @@ export class AlertEngine {
       // Judged on the best of them, and only now that there is a score to judge.
       if (!this.allowed(sub, snapshot.league, now, candidates[0].score)) continue;
 
-      await this.store.send(sub, buildPayload(candidates));
+      /*
+       * Recorded as sent before it is sent, which is deliberate.
+       *
+       * A held notification is a decision already taken: the cooldown and the
+       * daily count have to reflect it immediately, or the next snapshot a second
+       * later re-decides the same game and queues a second buzz behind the first.
+       * The payload describes the moment it was chosen, which is exactly the
+       * moment this viewer's screen will be showing when it lands.
+       */
+      const payload = buildPayload(candidates);
       this.record(sub, snapshot.league, now, candidates, candidates[0].score);
       sent += 1;
+      const hold = Math.max(0, sub.delaySeconds ?? 0) * 1000;
+      if (hold === 0) {
+        await this.store.send(sub, payload);
+      } else {
+        const timer = setTimeout(() => {
+          void this.store.send(sub, payload).catch(() => {});
+        }, hold);
+        timer.unref?.();
+      }
     }
     return sent;
   }

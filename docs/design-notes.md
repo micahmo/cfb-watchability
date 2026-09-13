@@ -636,6 +636,40 @@ HOME_CONF=5 AWAY_CONF=15 HOME_RANK=16 npx tsx scripts/replay.ts game.json
 teams as unranked FCS and understates everything. That produced a full round of wrong
 conclusions before it was noticed.
 
+## The board beats the television
+
+FastCast lands a play about two seconds after it happens. A broadcast is ten to forty-five seconds
+behind, worse on a streaming app. So the faster the feed got, the more reliably the board told Micah
+what had happened before he saw it.
+
+Polling slower is not the fix. That loses the intermediate states rather than delaying them: you
+would get a thirty-second sample of the game instead of the game a little late. Granularity and
+freshness are separate knobs and only one of them wants turning.
+
+**The delay belongs on the client**, which was not the first design. A server-side hold at
+`compose()` is tempting because both the poll and the push funnel through one assignment, and it
+would cover a cold page load. But it is necessarily global, and the right number is a property of
+the viewer's own feed: cable and a streaming app on the same sofa differ by half a minute. Buffering
+snapshots in the browser delays the poll and the push alike, since both arrive the same way, and
+costs one queue and no server change.
+
+Two things it has to get right. The stream sends a *delta* against the previous snapshot, so `latest`
+is kept separately from what is rendered: applying deltas to the delayed copy would build every
+update on stale state. And only the newest eligible snapshot is promoted, never each in turn, or a
+queue draining after a delay change replays the game in fast-forward.
+
+**Notifications cannot be delayed this way at all**, which is the part that matters most. A push
+arrives whether or not the page is open, so the browser buffer cannot reach it and the phone would
+buzz "upset alert" thirty seconds before the play lands on screen: the most intrusive possible
+version of the problem the feature exists to solve. The chosen delay therefore rides along on the
+subscription record and the send is held server side by the same amount, recorded as sent when it is
+decided rather than when it lands, so a held alert still counts against the cooldown and the daily
+cap.
+
+The one gap left is a cold page load, which gets the current state and spoils once. Closing it needs
+a server-side ring buffer and a `?delay=` on both endpoints, which is most of the complexity for the
+least of the benefit: opening the app cold is not the moment you are watching a play develop.
+
 ## Serving
 
 The service worker is network-first for HTML and cache-first only for content-hashed `/assets/`.

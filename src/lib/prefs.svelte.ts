@@ -25,6 +25,16 @@ export interface Prefs {
    * my evening", chronological answers "what is on next and is it any good".
    */
   upcomingOrder: "rank" | "time";
+  /**
+   * How far behind live to hold the board, in seconds.
+   *
+   * The push feed puts a play on screen about two seconds after it happens and a
+   * television broadcast runs anywhere from ten seconds to a minute behind, so
+   * the board spoils the game it is meant to help you watch. Per browser rather
+   * than on the server, because the right number is a property of the viewer's
+   * own feed: cable and a streaming app on the same sofa differ by half a minute.
+   */
+  delaySeconds: number;
 }
 
 const DEFAULTS: Prefs = {
@@ -34,6 +44,7 @@ const DEFAULTS: Prefs = {
   marketOff: false,
   alerts: { nfl: [], cfb: [] },
   upcomingOrder: "rank",
+  delaySeconds: 0,
 };
 
 function load(): Prefs {
@@ -66,6 +77,17 @@ export function persist(): void {
 export function setZip(zip: string): void {
   prefs.zip = /^\d{5}$/.test(zip) ? zip : null;
   prefs.marketOff = false;
+  persist();
+}
+
+/** Clamped, because a delay long enough to be confusing is worse than none. */
+export const MAX_DELAY_SECONDS = 120;
+
+export function setDelaySeconds(seconds: number): void {
+  const whole = Math.round(Number(seconds));
+  prefs.delaySeconds = Number.isFinite(whole)
+    ? Math.min(MAX_DELAY_SECONDS, Math.max(0, whole))
+    : 0;
   persist();
 }
 

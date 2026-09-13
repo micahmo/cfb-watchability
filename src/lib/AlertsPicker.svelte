@@ -104,11 +104,12 @@
     if (key === synced) return;
 
     const publicKey = config.publicKey;
+    const delaySeconds = prefs.delaySeconds;
     // Ticking four conferences is one update, not four.
     if (syncTimer !== null) clearTimeout(syncTimer);
     syncTimer = setTimeout(() => {
       synced = key;
-      void subscribe({ publicKey, wants, zip, favorites }).then((ok) => {
+      void subscribe({ publicKey, wants, zip, favorites, delaySeconds }).then((ok) => {
         // Let the next change try again rather than leaving the server behind.
         if (!ok) synced = null;
       });
@@ -131,7 +132,8 @@
 
     // This call is the authoritative one, so the background sync must not repeat it.
     if (syncTimer !== null) clearTimeout(syncTimer);
-    synced = nowEmpty ? null : JSON.stringify({ wants, favorites: prefs.favorites, zip: marketZip });
+    synced = nowEmpty ? null : JSON.stringify({ wants, favorites: prefs.favorites,
+      delaySeconds: prefs.delaySeconds, zip: marketZip });
 
     try {
       if (nowEmpty) {
@@ -142,6 +144,7 @@
           wants,
           zip: marketZip,
           favorites: prefs.favorites,
+      delaySeconds: prefs.delaySeconds,
         });
         if (!ok) {
           // Permission refused, or the push service said no. Put the switch back

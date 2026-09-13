@@ -71,6 +71,8 @@ export interface SubscribeInput {
   wants: Record<League, Category[]>;
   zip: string | null;
   favorites: Record<League, string[]>;
+  /** Seconds the viewer holds their board behind live; pushes wait the same. */
+  delaySeconds: number;
 }
 
 /**
@@ -112,9 +114,45 @@ export async function subscribe(input: SubscribeInput): Promise<boolean> {
       wants: input.wants,
       zip: input.zip,
       favorites: input.favorites,
+      delaySeconds: input.delaySeconds,
     }),
   });
   return res.ok;
+}
+
+/**
+ * Pushes a changed delay to an existing subscription, and does nothing otherwise.
+ *
+ * Separate from `subscribe` because it must never create one: the delay control
+ * is a board setting, and nudging it should not prompt somebody for notification
+ * permission they never asked for. Reuses the browser subscription already in
+ * hand, so there is no key to fetch and no prompt to raise.
+ */
+export async function updateDelaySeconds(
+  input: Omit<SubscribeInput, "publicKey">,
+): Promise<void> {
+  if (!pushSupported() || Notification.permission !== "granted") return;
+  const reg = await registration();
+  if (reg === null) return;
+  const sub = await reg.pushManager.getSubscription();
+  if (sub === null) return;
+  const raw = sub.toJSON() as { endpoint?: string; keys?: { p256dh?: string; auth?: string } };
+  try {
+    await fetch("/api/notifications/subscribe", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        endpoint: raw.endpoint,
+        keys: raw.keys,
+        wants: input.wants,
+        zip: input.zip,
+        favorites: input.favorites,
+        delaySeconds: input.delaySeconds,
+      }),
+    });
+  } catch {
+    // The board keeps its own delay regardless; the next load re-registers.
+  }
 }
 
 /** Drops the server record and the browser's own subscription together. */

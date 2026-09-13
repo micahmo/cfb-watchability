@@ -348,7 +348,11 @@ function parseSubscription(body: unknown): Parameters<SubscriptionStore["upsert"
   }
 
   const zip = typeof b?.zip === "string" && /^\d{5}$/.test(b.zip) ? b.zip : null;
-  return { endpoint, keys: { p256dh, auth }, wants, zip, favorites };
+  // Same ceiling the board applies, re-checked here because nothing from a
+  // browser is trusted and this one schedules a timer.
+  const raw = Number(b?.delaySeconds);
+  const delaySeconds = Number.isFinite(raw) ? Math.min(120, Math.max(0, Math.round(raw))) : 0;
+  return { endpoint, keys: { p256dh, auth }, wants, zip, favorites, delaySeconds };
 }
 
 function leagueFrom(url: string): League {

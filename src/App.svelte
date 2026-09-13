@@ -8,6 +8,8 @@
   import FavoriteConferences from "./lib/FavoriteConferences.svelte";
   import MarketPicker from "./lib/MarketPicker.svelte";
   import AlertsPicker from "./lib/AlertsPicker.svelte";
+  import DelayPicker from "./lib/DelayPicker.svelte";
+  import { updateDelaySeconds } from "./lib/push";
   import UpdatePrompt from "./lib/UpdatePrompt.svelte";
 
   import GameCard from "./lib/GameCard.svelte";
@@ -64,7 +66,7 @@
    * because they share a row: two panels open at once would overlap, and a panel
    * that is a flex sibling of its own button wedges the row apart when it opens.
    */
-  let openPanel = $state<"favorites" | "market" | "alerts" | null>(null);
+  let openPanel = $state<"favorites" | "market" | "alerts" | "delay" | null>(null);
 
   /**
    * The last market the board resolved, kept across tab switches.
@@ -80,13 +82,74 @@
     if (zip) lastMarketZip = zip;
   });
 
-  function togglePanel(which: "favorites" | "market" | "alerts"): void {
+  function togglePanel(which: "favorites" | "market" | "alerts" | "delay"): void {
     openPanel = openPanel === which ? null : which;
   }
 
+  /*
+   * Two snapshots, because the board is allowed to be behind and the stream is not.
+   *
+   * `latest` is the truth as received. `snapshot` is what the viewer sees, which
+   * may be several seconds older. They have to be separate: a stream message
+   * carries a delta applied to the *previous* snapshot, so applying it to the
+   * delayed one would build every update on stale state. `latest` is deliberately
+   * not reactive, since nothing renders from it.
+   */
+  let latest: Snapshot | null = null;
+  let held = $state<Array<{ at: number; snap: Snapshot }>>([]);
   let snapshot = $state<Snapshot | null>(null);
   let loadError = $state<string | null>(null);
   let loading = $state(true);
+
+  /**
+   * Takes a freshly received snapshot and decides when it is allowed on screen.
+   *
+   * With no delay this is the old behaviour exactly, assignment and nothing else.
+   * With one, the snapshot waits its turn in a queue and `release` promotes it.
+   */
+  function receive(next: Snapshot): void {
+    if (next.league !== prefs.league) return;
+    latest = next;
+    loadError = null;
+    loading = false;
+    if (prefs.delaySeconds <= 0) {
+      held = [];
+      snapshot = next;
+      now = Date.now();
+      return;
+    }
+    // Nothing has ever been shown, so there is nothing to spoil and a blank board
+    // for the length of the delay would be worse than starting level.
+    if (snapshot === null) {
+      snapshot = next;
+      now = Date.now();
+      return;
+    }
+    held = [...held, { at: Date.now(), snap: next }];
+  }
+
+  /**
+   * Promotes whatever has waited long enough, skipping anything it overtook.
+   *
+   * Only the newest eligible snapshot is shown: the ones behind it describe
+   * moments that have already passed, and rendering each in turn would replay the
+   * game in fast-forward rather than delay it.
+   */
+  function release(at: number): void {
+    if (held.length === 0) return;
+    const cutoff = at - prefs.delaySeconds * 1000;
+    let promoted: Snapshot | null = null;
+    let i = 0;
+    while (i < held.length && held[i].at <= cutoff) {
+      promoted = held[i].snap;
+      i += 1;
+    }
+    if (i > 0) held = held.slice(i);
+    if (promoted !== null) {
+      snapshot = promoted;
+      now = Date.now();
+    }
+  }
   // Ticks once a second purely so the "updated Ns ago" label stays honest.
   let now = $state(Date.now());
 
@@ -95,11 +158,9 @@
       const next = await fetchSnapshot(league, prefs.zip, prefs.marketOff);
       // Discard a response that arrived after the user switched tabs.
       if (next.league !== prefs.league) return;
-      snapshot = next;
-      loadError = null;
+      receive(next);
     } catch (err) {
       loadError = err instanceof Error ? err.message : String(err);
-    } finally {
       loading = false;
       now = Date.now();
     }
@@ -112,6 +173,8 @@
     prefs.zip;
     prefs.marketOff;
     snapshot = null;
+    latest = null;
+    held = [];
     loading = true;
     void refresh(league);
 
@@ -119,13 +182,10 @@
        proxy that buffers event streams, or a browser without EventSource, costs
        freshness rather than the board, and the poll is also what repairs a stream
        that reconnected having missed something. */
+    // Applied to `latest`, never to what is on screen, so a delayed board still
+    // builds each delta on the state the server actually sent it against.
     const stop = openBoardStream(league, prefs.zip, prefs.marketOff, (apply) => {
-      const next = apply(snapshot);
-      if (next.league !== prefs.league) return;
-      snapshot = next;
-      loadError = null;
-      loading = false;
-      now = Date.now();
+      receive(apply(latest));
     });
     const poll = setInterval(() => void refresh(league), REFRESH_MS);
     return () => {
@@ -135,8 +195,34 @@
   });
 
   $effect(() => {
-    const tick = setInterval(() => (now = Date.now()), 1000);
+    const tick = setInterval(() => {
+      now = Date.now();
+      // Same timer as the "updated Ns ago" label, so the delay costs no extra one.
+      release(now);
+    }, 1000);
     return () => clearInterval(tick);
+  });
+
+  /* Lowering the delay has to take effect at once rather than at the next tick,
+     since the whole control is built to be nudged while watching. */
+  $effect(() => {
+    prefs.delaySeconds;
+    release(Date.now());
+  });
+
+  /* Debounced, because the control is a slider: telling the server on every
+     intermediate value would be a request per pixel dragged. */
+  $effect(() => {
+    const seconds = prefs.delaySeconds;
+    const timer = setTimeout(() => {
+      void updateDelaySeconds({
+        wants: prefs.alerts,
+        zip: lastMarketZip,
+        favorites: prefs.favorites,
+        delaySeconds: seconds,
+      });
+    }, 1500);
+    return () => clearTimeout(timer);
   });
 
   /**
@@ -286,7 +372,11 @@
 
   const updatedLabel = $derived.by(() => {
     void now;
-    return snapshot ? relativeTime(snapshot.updatedAt) : "never";
+    if (!snapshot) return "never";
+    /* With a delay set, "updated 30s ago" is true and reads as a fault. Naming the
+       delay instead says the board is behind on purpose. */
+    if (prefs.delaySeconds > 0) return `${prefs.delaySeconds}s behind`;
+    return relativeTime(snapshot.updatedAt);
   });
 </script>
 
@@ -330,6 +420,11 @@
       marketZip={lastMarketZip}
       open={openPanel === "alerts"}
       ontoggle={() => togglePanel("alerts")}
+    />
+    <DelayPicker
+      queued={held.length}
+      open={openPanel === "delay"}
+      ontoggle={() => togglePanel("delay")}
     />
   </div>
 </header>

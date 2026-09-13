@@ -17,6 +17,15 @@ export interface Subscription {
   wants: Record<League, Category[]>;
   /** Mirrors the viewer's board settings, so alerts match what they would see. */
   zip: string | null;
+  /**
+   * How far behind live this viewer holds their board, in seconds.
+   *
+   * Sent so a notification cannot beat the television when the board has been
+   * told not to. The board's own delay is a browser-side buffer and cannot reach
+   * a push, which arrives whether or not the page is even open, so the number has
+   * to come here too or the phone spoils exactly what the board is withholding.
+   */
+  delaySeconds: number;
   favorites: Record<League, string[]>;
   createdAt: string;
   /**
