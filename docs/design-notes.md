@@ -928,6 +928,38 @@ billing loses to a genuine late thriller scoring 0.95 on closeness. It only has 
 Checked against a live slate: two games moved, both of them freshly kicked off, and every blowout
 on the board sat at exactly 0.00.
 
+### The prior cancels itself out of the live upset term
+
+`upsetTension` measures an upset in win-probability space: how far the underdog's live win
+probability has climbed from where the closing line put it, times how much doubt is left. Both
+halves of that subtraction carry the pregame prior, because ESPN's in-game win probability holds
+the spread as a decaying prior, so the prior largely cancels and the term reads almost nothing on
+exactly the games it was written for.
+
+Oregon State, 25.5-point underdogs, trailing Texas Tech by **one point** in the third quarter:
+
+```
+upsetTension  0.032     ESPN still had them at 10.3%
+upset         0.504     the scoreboard against the line, which is right
+prominence    0.925  -> 16.7 pts
+primary       0.095  ->  5.5 pts
+```
+
+Texas Tech's reputation was worth sixteen points of that game's rating and the upset itself was
+worth three and a half. The board knew; it just had the knowledge wired to a term carrying 0.07
+while the term carrying 0.58 was looking at a number the prior had flattened.
+
+So the scoreboard-space measure becomes a dominant term too, at 0.75, **gated on the underdog being
+within one score**. The gate is the whole thing. Without it this is a regression, not a fix: `upset`
+saturates seventeen points past the line, which a 45.5-point underdog reaches by *losing by 28*, and
+dropping the win-probability term in favour of the scoreboard one promoted exactly those games, one
+of them from 9.7 to 44.7. `doubt` had been suppressing them all along. Being level, ahead, or one
+score away is what separates an upset from a cover.
+
+Both terms stay, because they guard different failures. Replayed across all 67 finished games with
+a closing line: the 42 games where a real underdog was run off the field peak at 37.9 at worst and
+under 30 for all but one, while the three genuine underdog wins peak at 53.7, 54.9 and 72.2.
+
 ### The result term could not rank results
 
 `decisiveness` was `upset * 0.75`, and `upset` saturates. `MAX_VS_LINE` is seventeen, so

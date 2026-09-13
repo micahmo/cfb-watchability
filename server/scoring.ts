@@ -468,6 +468,25 @@ function billingCarry(input: ScoreInputs, progress: number): number {
   return clamp((expected / 100) * BILLING_CARRY * (1 - progress / BILLING_UNTIL) * contradiction);
 }
 
+/**
+ * A live upset, measured against the scoreboard rather than against ESPN's model.
+ *
+ * Gated on the underdog being within one score, which is what separates an upset
+ * from a cover and is the only reason this can be trusted as a dominant term. A
+ * 45-point dog losing by 28 is maximal on `upset` and is not a game anybody wants
+ * sent to them; being level, ahead, or one score away is what makes the surprise
+ * something that can still become a result.
+ */
+function upsetDramaScore(input: ScoreInputs, upset: number): number {
+  if (input.isFinal === true || input.homeSpread === null) return 0;
+  if (Math.abs(input.homeSpread) < UPSET_MIN_SPREAD) return 0;
+  const homeFavoured = input.homeSpread < 0;
+  const dog = homeFavoured ? input.away : input.home;
+  const fav = homeFavoured ? input.home : input.away;
+  if (fav.score - dog.score > ONE_SCORE) return 0;
+  return clamp(upset * UPSET_DRAMA_SHARE);
+}
+
 function decisivenessScore(input: ScoreInputs): number {
   if (input.isFinal !== true || input.homeSpread === null) return 0;
   const spread = Math.abs(input.homeSpread);
@@ -531,6 +550,7 @@ export function scoreGame(input: ScoreInputs): ScoreBreakdown {
    */
   const decisiveness = decisivenessScore(input);
   const billing = billingCarry(input, progress);
+  const upsetDrama = upsetDramaScore(input, upset);
 
   const components: ScoreComponents = {
     tension,
@@ -543,7 +563,7 @@ export function scoreGame(input: ScoreInputs): ScoreBreakdown {
     // happening that was not supposed to, a real underdog finished the job, or it
     // has only just kicked off and was billed as the one to watch.
     billing,
-    primary: Math.max(core, clutch, upsetTension, decisiveness, billing),
+    primary: Math.max(core, clutch, upsetTension, upsetDrama, decisiveness, billing),
     prominence: prominenceScore({
       league: input.league,
       homeConferenceId: input.home.conferenceId,
@@ -662,6 +682,23 @@ const LATENESS_FLOOR = 0.15;
  * it.
  */
 const DECISIVE_SCALE = 34;
+/**
+ * What a live upset measured against the scoreboard is worth as a dominant term.
+ *
+ * `upsetTension` reads the same event in win-probability space, and the pregame
+ * prior sits on both sides of its subtraction and largely cancels: Oregon State,
+ * 25.5-point underdogs, trailing Texas Tech by *one* in the third quarter, scored
+ * 0.032 on it, because ESPN still had them at 10%. The scoreboard term had the
+ * game right at 0.504 and carried 0.07 of the weighting, so Texas Tech's
+ * reputation was worth 16.7 points of that game's rating and the upset itself was
+ * worth 3.5.
+ *
+ * Both terms stay. They guard different failures, which is the whole lesson here:
+ * drop the win-probability one and a 45.5-point underdog *losing by 28* is
+ * promoted to a rating of 44.7, because being seventeen points better than the
+ * line is a cover, not an upset. `doubt` was suppressing that all along.
+ */
+const UPSET_DRAMA_SHARE = 0.75;
 /**
  * What a game's pregame billing is still worth once it has kicked off.
  *
