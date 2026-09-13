@@ -292,6 +292,51 @@ The leagues need different numbers for the obvious reason: 61 points is a shooto
 Tuesday in the other. The first NFL pass used 60 games from five Sundays, which is 1.7% per game and
 far too coarse to calibrate a percentage point on; the full season moved the answer enough to matter.
 
+### A finished game can be un-finished by the feed that is supposed to be fresher
+
+The rewind guard vets the poll against the held pushed document, on the reasoning that the push feed
+is the fresher of the two. At the final whistle that stops being true. Captured in the history log,
+one game, same score, same period, same clock, only the state moving, at poll-interval spacing:
+
+```
+02:53:40  in    13-16  wp 0.974
+02:54:05  post  13-16  wp null    the poll gets it right
+02:54:32  in    13-16  wp 1       the held pushed document takes it back
+02:55:02  post  13-16  wp null
+```
+
+The win probability is the tell. A finished game has none, so `wp null` is the REST document and
+`wp 1` is the pushed one still carrying its last value. On the board this is the hero card losing a
+game to the recap and then reclaiming it, which is what kept being reported as "it disappeared and
+jumped back".
+
+Fixed without needing to know which patch does it, because there is a rule that is simply true: a
+game that has ended cannot un-end. A one-way latch, in memory, holding every game this process has
+watched finish.
+
+**Two things bound it.** The latch only arms at period four or later, so a spurious `post` in the
+second quarter cannot pin a live game as finished for the life of the process, which is the only way
+this guard could cost more than the flap it prevents. And it is deliberately not persisted: a restart
+correctly forgets, since the scoreboard it fetches on the way up will call those games finished
+anyway.
+
+Worth saying plainly: this one is reasoned rather than observed. By the time it was diagnosed the
+affected games had settled, and 504 paired samples against the deployed build produced zero flaps in
+either, so the fix is argued from the captured evidence rather than demonstrated against a live
+recurrence.
+
+### Most of what looked like oscillation was a deploy
+
+Whole-snapshot events, not per-game corruption. At three timestamps every game on the board lost its
+closing line at the same instant, and a few also showed the clock jumping backwards. The container
+start time matches the third exactly. A Force Update recreates the container, which empties the line
+store and `rawEvents` together, so the rating of every game with an upset term collapses until
+`backfillLines` catches up, and the first REST poll has no held document to be checked against and is
+free to be behind the push feed it no longer remembers.
+
+So a deploy mid-slate is not free, and on a night of frequent deploys it produces exactly the
+symptoms of a data bug. Persisting the line store would remove most of it.
+
 ## Polling is adaptive because the endpoint is undocumented
 
 The ESPN scoreboard is public and undocumented with no published rate limit, so the poller is

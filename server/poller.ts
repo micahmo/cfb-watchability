@@ -247,6 +247,30 @@ export class LeaguePoller {
 
   /** Notified after every successful poll, so alerts see each new snapshot once. */
   private readonly onSnapshot: ((snapshot: Snapshot) => void) | null;
+  /**
+   * Games this process has seen finish, which may never be un-finished.
+   *
+   * The poll and the push disagree about the end of a game, and the guard that
+   * already exists only vets the poll: the push feed is meant to be the fresher
+   * of the two, so it is trusted. At the final whistle it stops being fresher.
+   * Captured on the college board, same score, same period, same clock, only the
+   * state moving, at poll-interval spacing:
+   *
+   *   02:53:40  in    13-16  wp 0.974
+   *   02:54:05  post  13-16  wp null    the poll gets it right
+   *   02:54:32  in    13-16  wp 1       the held pushed document wins
+   *   02:55:02  post  13-16  wp null
+   *
+   * The win probability is the tell, since a finished game has none and the
+   * pushed document is still carrying its last one. On the board this reads as
+   * the hero card losing a game to the recap and then taking it back.
+   *
+   * Deliberately a one-way latch and deliberately in memory. A game ending is the
+   * one transition in football that cannot be undone, so no evidence is needed
+   * for the reverse and none should be accepted; and a restart correctly forgets,
+   * since the scoreboard it fetches will call those games finished anyway.
+   */
+  private readonly finished = new Set<string>();
 
   constructor(
     league: League,
@@ -695,6 +719,21 @@ export class LeaguePoller {
       if (raw.state === "in") this.swings.record(raw.id, raw.homeWinProb, now);
     }
     this.swings.prune(now);
+
+    /* Once final, final. See `finished`: the push feed keeps a finished game alive
+       for a poll interval at a time, and the board flaps it between the hero slot
+       and the recap. */
+    for (const raw of games) {
+      // The period check bounds the latch. A real final has played four quarters,
+      // so requiring that means a spurious `post` in the second cannot pin a live
+      // game as finished for the life of the process, which is the one way this
+      // guard could do more damage than the flap it prevents.
+      if (raw.state === "post" && raw.period >= 4) this.finished.add(raw.id);
+      else if (this.finished.has(raw.id)) {
+        raw.state = "post";
+        raw.homeWinProb = null;
+      }
+    }
 
     /*
      * ESPN moves a game out of `pre` before a snap is played, for a weather delay
