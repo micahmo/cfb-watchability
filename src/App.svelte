@@ -87,19 +87,30 @@
   }
 
   /*
-   * Two snapshots, because the board is allowed to be behind and the stream is not.
+   * Both leagues run at once, and each keeps two snapshots.
    *
-   * `latest` is the truth as received. `snapshot` is what the viewer sees, which
+   * `latest` is the truth as received, `boards` is what a viewer would see, which
    * may be several seconds older. They have to be separate: a stream message
    * carries a delta applied to the *previous* snapshot, so applying it to the
-   * delayed one would build every update on stale state. `latest` is deliberately
+   * delayed copy would build every update on stale state. `latest` is deliberately
    * not reactive, since nothing renders from it.
+   *
+   * Per league rather than per tab, because tearing this down on a tab switch was
+   * itself a spoiler: the freshly fetched board arrived with nothing older to hold
+   * it against and went straight to screen undelayed. Keeping the other league
+   * streaming in the background costs one connection and a few dozen kilobytes,
+   * and means switching tabs shows a board that has been quietly running behind
+   * all along rather than one that jumps to live.
    */
-  let latest: Snapshot | null = null;
-  let held = $state<Array<{ at: number; snap: Snapshot }>>([]);
-  let snapshot = $state<Snapshot | null>(null);
-  let loadError = $state<string | null>(null);
-  let loading = $state(true);
+  const LEAGUES: League[] = ["nfl", "cfb"];
+  let latest: Record<League, Snapshot | null> = { nfl: null, cfb: null };
+  let held = $state<Record<League, Array<{ at: number; snap: Snapshot }>>>({ nfl: [], cfb: [] });
+  let boards = $state<Record<League, Snapshot | null>>({ nfl: null, cfb: null });
+  let errors = $state<Record<League, string | null>>({ nfl: null, cfb: null });
+
+  const snapshot = $derived(boards[prefs.league]);
+  const loadError = $derived(errors[prefs.league]);
+  const loading = $derived(boards[prefs.league] === null && errors[prefs.league] === null);
 
   /**
    * Takes a freshly received snapshot and decides when it is allowed on screen.
@@ -108,24 +119,24 @@
    * With one, the snapshot waits its turn in a queue and `release` promotes it.
    */
   function receive(next: Snapshot): void {
-    if (next.league !== prefs.league) return;
-    latest = next;
-    loadError = null;
-    loading = false;
+    const league = next.league;
+    latest[league] = next;
+    errors[league] = null;
     if (prefs.delaySeconds <= 0) {
-      held = [];
-      snapshot = next;
+      held[league] = [];
+      boards[league] = next;
       now = Date.now();
       return;
     }
-    // Nothing has ever been shown, so there is nothing to spoil and a blank board
-    // for the length of the delay would be worse than starting level.
-    if (snapshot === null) {
-      snapshot = next;
+    // Nothing has ever been shown for this league, so there is nothing to spoil
+    // and a blank board for the length of the delay would be worse than starting
+    // level. This is the one way left to be spoiled, and only ever once.
+    if (boards[league] === null) {
+      boards[league] = next;
       now = Date.now();
       return;
     }
-    held = [...held, { at: Date.now(), snap: next }];
+    held[league] = [...held[league], { at: Date.now(), snap: next }];
   }
 
   /**
@@ -136,18 +147,21 @@
    * game in fast-forward rather than delay it.
    */
   function release(at: number): void {
-    if (held.length === 0) return;
     const cutoff = at - prefs.delaySeconds * 1000;
-    let promoted: Snapshot | null = null;
-    let i = 0;
-    while (i < held.length && held[i].at <= cutoff) {
-      promoted = held[i].snap;
-      i += 1;
-    }
-    if (i > 0) held = held.slice(i);
-    if (promoted !== null) {
-      snapshot = promoted;
-      now = Date.now();
+    for (const league of LEAGUES) {
+      const queue = held[league];
+      if (queue.length === 0) continue;
+      let promoted: Snapshot | null = null;
+      let i = 0;
+      while (i < queue.length && queue[i].at <= cutoff) {
+        promoted = queue[i].snap;
+        i += 1;
+      }
+      if (i > 0) held[league] = queue.slice(i);
+      if (promoted !== null) {
+        boards[league] = promoted;
+        now = Date.now();
+      }
     }
   }
   // Ticks once a second purely so the "updated Ns ago" label stays honest.
@@ -155,43 +169,42 @@
 
   async function refresh(league: League) {
     try {
-      const next = await fetchSnapshot(league, prefs.zip, prefs.marketOff);
-      // Discard a response that arrived after the user switched tabs.
-      if (next.league !== prefs.league) return;
-      receive(next);
+      receive(await fetchSnapshot(league, prefs.zip, prefs.marketOff));
     } catch (err) {
-      loadError = err instanceof Error ? err.message : String(err);
-      loading = false;
+      errors[league] = err instanceof Error ? err.message : String(err);
       now = Date.now();
     }
   }
 
+  /*
+   * Deliberately does not read `prefs.league`.
+   *
+   * Both leagues stay connected whichever tab is showing, so switching tabs tears
+   * nothing down and rebuilds nothing. The market settings do belong here, since
+   * availability is resolved server side and changing them has to reopen both.
+   */
   $effect(() => {
-    const league = prefs.league;
-    // Read deliberately: changing either has to re-run the effect, since
-    // availability is resolved server side.
-    prefs.zip;
-    prefs.marketOff;
-    snapshot = null;
-    latest = null;
-    held = [];
-    loading = true;
-    void refresh(league);
+    const zip = prefs.zip;
+    const marketOff = prefs.marketOff;
 
-    /* The stream is the fast path and the poll is the floor. Keeping both means a
-       proxy that buffers event streams, or a browser without EventSource, costs
-       freshness rather than the board, and the poll is also what repairs a stream
-       that reconnected having missed something. */
-    // Applied to `latest`, never to what is on screen, so a delayed board still
-    // builds each delta on the state the server actually sent it against.
-    const stop = openBoardStream(league, prefs.zip, prefs.marketOff, (apply) => {
-      receive(apply(latest));
+    const stops = LEAGUES.map((league) => {
+      void refresh(league);
+      /* The stream is the fast path and the poll is the floor. Keeping both means a
+         proxy that buffers event streams, or a browser without EventSource, costs
+         freshness rather than the board, and the poll is also what repairs a stream
+         that reconnected having missed something. */
+      // Applied to `latest`, never to what is on screen, so a delayed board still
+      // builds each delta on the state the server actually sent it against.
+      const stop = openBoardStream(league, zip, marketOff, (apply) => {
+        receive(apply(latest[league]));
+      });
+      const poll = setInterval(() => void refresh(league), REFRESH_MS);
+      return () => {
+        stop();
+        clearInterval(poll);
+      };
     });
-    const poll = setInterval(() => void refresh(league), REFRESH_MS);
-    return () => {
-      stop();
-      clearInterval(poll);
-    };
+    return () => stops.forEach((stop) => stop());
   });
 
   $effect(() => {
@@ -422,7 +435,7 @@
       ontoggle={() => togglePanel("alerts")}
     />
     <DelayPicker
-      queued={held.length}
+      queued={held[prefs.league].length}
       open={openPanel === "delay"}
       ontoggle={() => togglePanel("delay")}
     />
