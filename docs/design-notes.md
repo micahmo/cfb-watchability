@@ -1223,6 +1223,19 @@ sent, so the background sync does not repeat it, and a burst of changes is debou
 four conferences is one update. And a re-registration carrying no market must not erase a known
 one, since the zip is null until a snapshot resolves one, which on the college tab may be never.
 
+### What the delay must not hold back
+
+The board delay is a blunt instrument by design: it buffers whole snapshots, so anything carried on
+one inherits it. The build id is carried on one, and `UpdatePrompt` was reading it from the delayed
+copy, which meant a deploy went unannounced for as long as the delay was set. At two minutes the
+control that exists to stop the board spoiling a broadcast was deciding when somebody hears about a
+new version of the app.
+
+So the build is tracked separately, from the feed rather than the board. The rule the delay follows
+is that it holds back anything that describes the game and nothing that describes the service.
+Notifications are the other side of the same rule, and go the opposite way: they *are* about the
+game, cannot be reached by a browser-side buffer, and so are held server side by the same number.
+
 ## The settings row stopped fitting
 
 Four controls, and on a phone picking a second conference pushed the last one onto a new line. Every

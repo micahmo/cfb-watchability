@@ -154,6 +154,17 @@
   let held = $state<Record<League, Array<{ at: number; snap: Snapshot }>>>({ nfl: [], cfb: [] });
   let boards = $state<Record<League, Snapshot | null>>({ nfl: null, cfb: null });
   let errors = $state<Record<League, string | null>>({ nfl: null, cfb: null });
+  /**
+   * The build being served, taken from the feed rather than from the board.
+   *
+   * Everything else here is allowed to run behind so it does not spoil a
+   * broadcast. This is not about the game: holding it back would mean a deploy
+   * went unannounced for up to two minutes, and at that point the delay control
+   * is deciding when somebody hears about a new version of the app, which is none
+   * of its business. Server-wide rather than per league, and carried by both the
+   * poll and the stream.
+   */
+  let latestBuild = $state<string | null>(null);
 
   const snapshot = $derived(boards[prefs.league]);
   const loadError = $derived(errors[prefs.league]);
@@ -169,6 +180,7 @@
     const league = next.league;
     latest[league] = next;
     errors[league] = null;
+    if (next.build) latestBuild = next.build;
     if (prefs.delaySeconds <= 0) {
       held[league] = [];
       boards[league] = next;
@@ -638,7 +650,7 @@
   {/if}
 </div>
 
-<UpdatePrompt serverBuild={snapshot?.build ?? null} />
+<UpdatePrompt serverBuild={latestBuild} />
 
 <style>
   header {
