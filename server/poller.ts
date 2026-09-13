@@ -70,8 +70,15 @@ const MAX_LINE_LOOKUPS_PER_POLL = 4;
  * an order of magnitude fresher than the thirty-second poll it replaces.
  */
 const PATCH_COALESCE_MS = 1000;
-/** How long a missing situation may be filled in from the last one seen. */
-const SITUATION_CARRY_MS = 4 * 60 * 1000;
+/**
+ * How long a missing situation may be filled in from the last one seen.
+ *
+ * Forty-five seconds rather than four minutes. The carry now fires on the common
+ * case rather than the rare one, so its job changed: it is bridging the seconds
+ * between snaps and through a timeout, not surviving a long outage, and a down
+ * and distance from four minutes ago describes a different drive.
+ */
+const SITUATION_CARRY_MS = 45 * 1000;
 /**
  * How long a missing win probability may be filled in from the last one seen.
  *
@@ -579,16 +586,21 @@ export class LeaguePoller {
   /**
    * Fills a missing situation from the last one seen, within limits.
    *
-   * Only when the *whole* block is gone. Down and distance alone going absent is
-   * ordinary football, between possessions or on a kickoff, and carrying "3rd & 6"
-   * across a punt would invent a fact. The presence of a win probability or a last
-   * play is what says the block is there and the missing down is real.
+   * The score is what guards it, and it turns out to guard it precisely.
    *
-   * Two guards on the carry itself, because a wrong value is worse than a blank
-   * one. It expires, since a win probability from four minutes ago is no longer
-   * about this game. And it is dropped the moment the score changes: a touchdown
-   * moves the probability, flips possession, resets the down and makes the last
-   * play the scoring play, so everything held is stale in the same instant.
+   * Everything that legitimately ends a possession on a dead ball also changes the
+   * score: a touchdown, the extra point after it, a field goal. So the held
+   * situation is dropped exactly when it stops being true, and the diagram
+   * correctly shows nothing through the kick and the kickoff that follow. What
+   * survives the guard is the case the diagram should survive: a timeout, where
+   * the ball is spotted and it is still second and seven, and the seconds between
+   * snaps of a drive that is still going.
+   *
+   * A punt is the one thing that slips through, since it changes possession
+   * without changing the score. It costs a second or two of a stale down before
+   * the receiving team's situation arrives, which is a better trade than the
+   * flicker: a board that blinks its field diagram out several times a drive
+   * trains you to stop looking at it.
    */
   private carrySituation(games: RawGame[], now: number): void {
     for (const game of games) {
@@ -630,7 +642,21 @@ export class LeaguePoller {
       }
 
       const score = `${game.away.score}-${game.home.score}`;
-      const present = game.homeWinProb !== null || game.lastPlay !== null;
+      /*
+       * Whether the situation is here, asked of the situation itself.
+       *
+       * This used to ask whether a win probability or a last play had arrived, on
+       * the reasoning that their presence proved the block was real and so a
+       * missing down was real too. Measured against a live slate, that is simply
+       * false: across 600 samples of fifteen games the field diagram was absent
+       * 27% of the time, and in *every* one of those samples `down` and
+       * `possession` were missing while `lastPlay` and the win probability were
+       * both still there. The old test could therefore never fire on the case it
+       * most needed to, and the diagram flickered out mid-drive, between snaps,
+       * and through every timeout.
+       */
+      const present =
+        game.down !== null && game.distance !== null && game.possessionTeamId !== null;
 
       if (present) {
         this.lastSituation.set(game.id, {

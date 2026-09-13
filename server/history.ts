@@ -40,6 +40,17 @@ interface Row {
   clock: string;
   spread: number | null;
   wp: number | null;
+  /*
+   * The situation, because its absence is a thing worth being able to ask about
+   * later. The field diagram flickering out mid-drive took a live sampling run to
+   * diagnose, entirely because these were not recorded and the past could not be
+   * consulted.
+   */
+  yardLine: number | null;
+  down: number | null;
+  possession: string | null;
+  driveStart: number | null;
+  lastPlay: string | null;
   total: number;
   core: number;
   clutch: number;
@@ -60,6 +71,8 @@ interface Mark {
   period: number;
   score: string;
   total: number;
+  /** Whether the field diagram had everything it needs. */
+  situation: boolean;
 }
 
 /**
@@ -110,14 +123,19 @@ export class History {
         period: game.period,
         score: `${game.away.score}-${game.home.score}`,
         total: game.score.total,
+        situation:
+          game.down !== null && game.distance !== null && game.possessionTeamId !== null,
       };
       const last = this.marks.get(key);
       // A change in anything that matters, or the heartbeat, whichever comes first.
+      // `situation` is in there because whether the field diagram can be drawn is
+      // itself the question a later reader is most likely to be asking.
       const changed =
         last === undefined ||
         last.state !== mark.state ||
         last.period !== mark.period ||
         last.score !== mark.score ||
+        last.situation !== mark.situation ||
         now - last.at >= HEARTBEAT_MS;
       if (!changed) continue;
       this.marks.set(key, mark);
@@ -141,6 +159,11 @@ export class History {
       clock: game.clock,
       spread: game.pregameSpread,
       wp: game.homeWinProb,
+      yardLine: game.yardLine,
+      down: game.down,
+      possession: game.possessionTeamId,
+      driveStart: game.driveStart,
+      lastPlay: game.lastPlay,
       total: s.total,
       core: round(s.core),
       clutch: round(s.clutch),

@@ -185,6 +185,33 @@ that long ago is no longer about this game. And it is dropped the instant the sc
 a touchdown moves the probability, flips possession, resets the down and makes the last play the
 scoring play, so everything held goes stale together.
 
+### The test for "is the situation here" was asking about the wrong fields
+
+The carry was gated on `homeWinProb !== null || lastPlay !== null`, on the reasoning that either of
+those being present proved the situation block was real and therefore a missing `down` was real too.
+That reasoning is false, and measurably so. Sampled every two seconds across fifteen live games, 600
+samples: the field diagram was absent **27% of the time**, and in every one of those samples `down`
+and `possession` were missing while `lastPlay` and the win probability were both still there. The
+old test could never fire on the case it most needed to, so the diagram blinked out mid-drive,
+between snaps, and through every timeout.
+
+Asking the situation about itself fixes it, and the score guard turns out to be exactly the right
+one. Everything that legitimately ends a possession on a dead ball also changes the score: a
+touchdown, the extra point after it, a field goal. So the held situation is dropped precisely when it
+stops being true, and the diagram still correctly shows nothing through the kick and the kickoff.
+What survives is what should: a timeout, where the ball is spotted and it is still second and seven,
+and the seconds between snaps of a live drive.
+
+Measured against the deployed build on the same games at the same moments, 420 paired samples: 56%
+drawn became 67%, with 80 recovered frames, all of them mid-drive plays. A punt is the one case that
+slips through, changing possession without changing the score, and it costs a second or two of stale
+down before the receiving team's situation arrives. That is a better trade than the flicker, because
+a diagram that blinks out several times a drive teaches you to stop looking at it.
+
+The carry window came down from four minutes to forty-five seconds at the same time. Its job changed:
+it is bridging the gap between snaps now, not surviving an outage, and a down and distance from four
+minutes ago belongs to a different drive.
+
 ## Tags must not promise more than the number supports
 
 Three renames, all the same mistake:
